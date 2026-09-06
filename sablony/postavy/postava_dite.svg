@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:pikto="https://github.com/aac/piktoedit"
+     width="1024" height="1024" viewBox="0 0 1024 1024" version="1.1" pikto:grid="16">
+  <title>Postava dite</title>
+  <rect x="0" y="0" width="1024" height="1024" fill="#ffffff" pikto:role="background" />
+
+  <rect x="456" y="620" width="52" height="150" rx="22" ry="22"
+        fill="#2c3e50" stroke="#000000" stroke-width="8" stroke-linejoin="round"
+        pikto:name="Noha leva" />
+  <rect x="518" y="620" width="52" height="150" rx="22" ry="22"
+        fill="#2c3e50" stroke="#000000" stroke-width="8" stroke-linejoin="round"
+        pikto:name="Noha prava" />
+  <ellipse cx="478" cy="776" rx="46" ry="26"
+           fill="#3f3f46" stroke="#000000" stroke-width="8" pikto:name="Bota leva" />
+  <ellipse cx="548" cy="776" rx="46" ry="26"
+           fill="#3f3f46" stroke="#000000" stroke-width="8" pikto:name="Bota prava" />
+
+  <rect x="386" y="424" width="48" height="170" rx="24" ry="24"
+        fill="#f1c40f" stroke="#000000" stroke-width="8" stroke-linejoin="round"
+        pikto:name="Ruka leva" />
+  <rect x="592" y="424" width="48" height="170" rx="24" ry="24"
+        fill="#f1c40f" stroke="#000000" stroke-width="8" stroke-linejoin="round"
+        pikto:name="Ruka prava" />
+
+  <rect x="428" y="412" width="168" height="220" rx="40" ry="40"
+        fill="#f1c40f" stroke="#000000" stroke-width="8" stroke-linejoin="round"
+        pikto:name="Telo" />
+
+  <ellipse cx="410" cy="604" rx="26" ry="26"
+           fill="#f6c9a0" stroke="#000000" stroke-width="8" pikto:name="Dlan leva" />
+  <ellipse cx="616" cy="604" rx="26" ry="26"
+           fill="#f6c9a0" stroke="#000000" stroke-width="8" pikto:name="Dlan prava" />
+
+  <rect x="494" y="378" width="36" height="46" rx="12" ry="12"
+        fill="#f6c9a0" stroke="#000000" stroke-width="8" pikto:name="Krk" />
+  <ellipse cx="512" cy="304" rx="96" ry="100"
+           fill="#f6c9a0" stroke="#000000" stroke-width="8" pikto:name="Hlava" />
+
+  <text x="512" y="960" text-anchor="middle" font-family="Arial" font-size="96"
+        font-weight="bold" fill="#000000" pikto:name="Popisek"
+        pikto:role="caption">POPISEK</text>
+</svg>

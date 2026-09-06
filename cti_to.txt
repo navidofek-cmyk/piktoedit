@@ -1,0 +1,29 @@
+Claude Code ma podobne navazani na session jako Codex.
+
+Pouziva se prikaz:
+
+claude --resume 54bbd236-adba-4251-84bd-84bb41c16748
+
+Aktualni session ID:
+
+54bbd236-adba-4251-84bd-84bb41c16748
+
+Projekt:
+
+C:\ubuntu\aac\vector_graphics_editor
+Editor piktogramu PiktoEdit, zalozeno 06.09.2026.
+
+Poznamka:
+
+Neni to `claude resume id`, ale `claude --resume [SESSION_ID]`, zkracene `-r`.
+Bez ID otevre `claude --resume` nabidku ulozenych session.
+Posledni session ve stejne slozce pokracuje pres `claude --continue`, zkracene `-c`.
+Prikaz se spousti ze slozky projektu, session se vedou podle ni.
+
+Prepis session:
+
+C:\Users\idofe\.claude\projects\C--ubuntu-aac-vector-graphics-editor\54bbd236-adba-4251-84bd-84bb41c16748.jsonl
+
+Session na webu:
+
+https://claude.ai/code/session_01MEp44N2oBjiKGszUCvStjw

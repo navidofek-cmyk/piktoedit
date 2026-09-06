@@ -1,0 +1,11 @@
+# Sestaveni PyInstalleru
+build/
+dist/
+*.pyc
+__pycache__/
+
+# Ulozene kresby uzivatele
+piktogramy/
+
+# Mistni nastaveni nastroju
+.claude/settings.local.json

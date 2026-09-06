@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:pikto="https://github.com/aac/piktoedit"
+     width="1024" height="1024" viewBox="0 0 1024 1024" version="1.1" pikto:grid="16">
+  <title>Ryba</title>
+  <rect x="0" y="0" width="1024" height="1024" fill="#ffffff" pikto:role="background" />
+
+  <path d="M 760 440 L 900 340 L 900 620 L 760 520 Z" fill="#e67e22"
+        stroke="#000000" stroke-width="8" stroke-linejoin="round" pikto:name="Ocas" />
+  <path d="M 160 480 c 120 -180 500 -180 620 0 c -120 180 -500 180 -620 0 Z"
+        fill="#f1c40f" stroke="#000000" stroke-width="8" stroke-linejoin="round"
+        pikto:name="Telo" />
+  <path d="M 420 350 L 520 250 L 560 372" fill="#e67e22" stroke="#000000"
+        stroke-width="8" stroke-linejoin="round" pikto:name="Hrbetni ploutev" />
+  <path d="M 430 600 L 500 700 L 560 596" fill="#e67e22" stroke="#000000"
+        stroke-width="8" stroke-linejoin="round" pikto:name="Bricni ploutev" />
+  <path d="M 300 400 c 60 40 60 120 0 160" fill="none" stroke="#000000"
+        stroke-width="8" stroke-linecap="round" pikto:name="Zabra" />
+  <ellipse cx="250" cy="450" rx="30" ry="30" fill="#ffffff" stroke="#000000"
+           stroke-width="8" pikto:name="Oko" />
+  <ellipse cx="250" cy="450" rx="12" ry="12" fill="#2c3e50" stroke="none"
+           pikto:name="Zornice" />
+  <path d="M 170 500 q 40 30 80 10" fill="none" stroke="#000000" stroke-width="7"
+        stroke-linecap="round" pikto:name="Usta" />
+
+  <text x="512" y="944" text-anchor="middle" font-family="Arial" font-size="96"
+        font-weight="bold" fill="#000000" pikto:name="Popisek"
+        pikto:role="caption">RYBA</text>
+</svg>

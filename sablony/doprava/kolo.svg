@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:pikto="https://github.com/aac/piktoedit"
+     width="1024" height="1024" viewBox="0 0 1024 1024" version="1.1" pikto:grid="16">
+  <title>Kolo</title>
+  <rect x="0" y="0" width="1024" height="1024" fill="#ffffff" pikto:role="background" />
+
+  <ellipse cx="270" cy="580" rx="170" ry="170" fill="none" stroke="#000000"
+           stroke-width="18" pikto:name="Kolo prednji" />
+  <ellipse cx="760" cy="580" rx="170" ry="170" fill="none" stroke="#000000"
+           stroke-width="18" pikto:name="Kolo zadni" />
+  <path d="M 270 580 L 460 580 L 560 380 L 380 380 Z" fill="none" stroke="#1668c1"
+        stroke-width="16" stroke-linejoin="round" pikto:name="Ram" />
+  <path d="M 460 580 L 760 580 L 560 380" fill="none" stroke="#1668c1"
+        stroke-width="16" stroke-linejoin="round" pikto:name="Ram zadni" />
+  <path d="M 380 380 L 270 580" fill="none" stroke="#1668c1" stroke-width="16"
+        stroke-linecap="round" pikto:name="Vidlice" />
+  <path d="M 330 330 L 430 330" fill="none" stroke="#000000" stroke-width="16"
+        stroke-linecap="round" pikto:name="Riditka" />
+  <path d="M 380 380 L 380 330" fill="none" stroke="#000000" stroke-width="14"
+        stroke-linecap="round" pikto:name="Predstavec" />
+  <path d="M 520 330 L 600 330" fill="none" stroke="#000000" stroke-width="20"
+        stroke-linecap="round" pikto:name="Sedlo" />
+  <path d="M 560 380 L 560 340" fill="none" stroke="#000000" stroke-width="14"
+        stroke-linecap="round" pikto:name="Sedlovka" />
+  <ellipse cx="460" cy="580" rx="46" ry="46" fill="none" stroke="#000000"
+           stroke-width="12" pikto:name="Prevodnik" />
+
+  <text x="512" y="944" text-anchor="middle" font-family="Arial" font-size="96"
+        font-weight="bold" fill="#000000" pikto:name="Popisek"
+        pikto:role="caption">KOLO</text>
+</svg>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:pikto="https://github.com/aac/piktoedit"
+     width="1024" height="1024" viewBox="0 0 1024 1024" version="1.1" pikto:grid="16">
+  <title>Prostredi - dily</title>
+  <rect x="0" y="0" width="1024" height="1024" fill="#ffffff" pikto:role="background" />
+
+  <ellipse cx="140" cy="140" rx="86" ry="86" fill="#f1c40f" stroke="#000000"
+           stroke-width="8" pikto:name="Slunce" />
+  <path d="M 320 170 c -44 0 -44 -62 4 -58 c 6 -44 74 -44 84 -6 c 44 -12 70 44 30 64 Z"
+        fill="#ffffff" stroke="#000000" stroke-width="8" stroke-linejoin="round"
+        pikto:name="Mrak" />
+  <path d="M 620 96 L 620 200 M 570 150 L 670 150" fill="none" stroke="#3498db"
+        stroke-width="10" stroke-linecap="round" pikto:name="Krizek" />
+  <path d="M 800 90 L 970 90 L 970 200 L 800 200 Z" fill="#ffffff" stroke="#000000"
+        stroke-width="8" stroke-linejoin="round" pikto:name="Okno" />
+  <path d="M 885 90 L 885 200 M 800 145 L 970 145" fill="none" stroke="#000000"
+        stroke-width="8" pikto:name="Kriz okna" />
+
+  <path d="M 90 560 L 90 400 L 250 300 L 410 400 L 410 560 Z" fill="#e6e8ec"
+        stroke="#000000" stroke-width="8" stroke-linejoin="round" pikto:name="Dum" />
+  <path d="M 60 410 L 250 278 L 440 410" fill="none" stroke="#c0392b" stroke-width="14"
+        stroke-linecap="round" stroke-linejoin="round" pikto:name="Strecha" />
+  <rect x="196" y="452" width="108" height="108" rx="6" ry="6" fill="#8b5a2b"
+        stroke="#000000" stroke-width="8" pikto:name="Dvere" />
+
+  <rect x="600" y="430" width="40" height="130" rx="12" ry="12" fill="#8b5a2b"
+        stroke="#000000" stroke-width="8" pikto:name="Kmen" />
+  <ellipse cx="620" cy="380" rx="120" ry="100" fill="#2ecc71" stroke="#000000"
+           stroke-width="8" pikto:name="Koruna stromu" />
+  <path d="M 830 560 c 0 -60 60 -60 60 0 Z" fill="#2ecc71" stroke="#000000"
+        stroke-width="8" stroke-linejoin="round" pikto:name="Kere" />
+
+  <path d="M 60 700 L 964 700" fill="none" stroke="#3f3f46" stroke-width="12"
+        stroke-linecap="round" pikto:name="Zeme" />
+  <path d="M 120 820 L 380 820 L 380 950 L 120 950 Z" fill="#3498db" stroke="#000000"
+        stroke-width="8" stroke-linejoin="round" pikto:name="Stul deska" />
+  <path d="M 520 820 L 660 820 L 660 950 M 520 820 L 520 950" fill="none"
+        stroke="#000000" stroke-width="10" stroke-linejoin="round"
+        pikto:name="Zidle" />
+  <path d="M 760 950 L 760 830 q 100 -60 200 0 L 960 950 Z" fill="#c0392b"
+        stroke="#000000" stroke-width="8" stroke-linejoin="round"
+        pikto:name="Postel" />
+</svg>

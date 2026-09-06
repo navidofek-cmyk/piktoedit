@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:pikto="https://github.com/aac/piktoedit"
+     width="1024" height="1024" viewBox="0 0 1024 1024" version="1.1" pikto:grid="16">
+  <title>Ptak</title>
+  <rect x="0" y="0" width="1024" height="1024" fill="#ffffff" pikto:role="background" />
+
+  <path d="M 640 480 L 850 360 L 830 540 Z" fill="#1668c1" stroke="#000000"
+        stroke-width="8" stroke-linejoin="round" pikto:name="Ocas" />
+  <ellipse cx="470" cy="470" rx="200" ry="160" fill="#3498db" stroke="#000000"
+           stroke-width="8" pikto:name="Telo" />
+  <path d="M 420 400 c 120 -40 200 40 180 140 c -110 30 -190 -40 -180 -140 Z"
+        fill="#1668c1" stroke="#000000" stroke-width="8" stroke-linejoin="round"
+        pikto:name="Kridlo" />
+  <ellipse cx="270" cy="330" rx="110" ry="100" fill="#3498db" stroke="#000000"
+           stroke-width="8" pikto:name="Hlava" />
+  <path d="M 170 330 L 70 360 L 168 396 Z" fill="#f1c40f" stroke="#000000"
+        stroke-width="8" stroke-linejoin="round" pikto:name="Zobak" />
+  <ellipse cx="250" cy="306" rx="22" ry="24" fill="#ffffff" stroke="#000000"
+           stroke-width="6" pikto:name="Oko" />
+  <ellipse cx="250" cy="306" rx="9" ry="9" fill="#2c3e50" stroke="none"
+           pikto:name="Zornice" />
+  <path d="M 420 620 L 420 700 M 380 700 L 460 700 M 540 620 L 540 700 M 500 700 L 580 700"
+        fill="none" stroke="#e67e22" stroke-width="12" stroke-linecap="round"
+        pikto:name="Nohy" />
+  <path d="M 300 740 L 760 740" fill="none" stroke="#8b5a2b" stroke-width="16"
+        stroke-linecap="round" pikto:name="Vetev" />
+
+  <text x="512" y="944" text-anchor="middle" font-family="Arial" font-size="96"
+        font-weight="bold" fill="#000000" pikto:name="Popisek"
+        pikto:role="caption">PTAK</text>
+</svg>

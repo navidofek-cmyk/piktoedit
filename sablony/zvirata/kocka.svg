@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:pikto="https://github.com/aac/piktoedit"
+     width="1024" height="1024" viewBox="0 0 1024 1024" version="1.1" pikto:grid="16">
+  <title>Kocka</title>
+  <rect x="0" y="0" width="1024" height="1024" fill="#ffffff" pikto:role="background" />
+
+  <path d="M 660 700 c 130 0 150 -180 60 -190 c -40 -4 -70 30 -50 70"
+        fill="none" stroke="#000000" stroke-width="16" stroke-linecap="round"
+        pikto:name="Ocas" />
+  <path d="M 300 700 L 300 480 q 0 -120 130 -120 L 560 360 q 130 0 130 120 L 690 700 Z"
+        fill="#e67e22" stroke="#000000" stroke-width="8" stroke-linejoin="round"
+        pikto:name="Telo" />
+  <rect x="330" y="640" width="70" height="80" rx="26" ry="26" fill="#e67e22"
+        stroke="#000000" stroke-width="8" pikto:name="Tlapka leva" />
+  <rect x="590" y="640" width="70" height="80" rx="26" ry="26" fill="#e67e22"
+        stroke="#000000" stroke-width="8" pikto:name="Tlapka prava" />
+
+  <path d="M 370 300 L 350 190 L 450 250 Z" fill="#e67e22" stroke="#000000"
+        stroke-width="8" stroke-linejoin="round" pikto:name="Ucho leve" />
+  <path d="M 620 300 L 640 190 L 540 250 Z" fill="#e67e22" stroke="#000000"
+        stroke-width="8" stroke-linejoin="round" pikto:name="Ucho prave" />
+  <ellipse cx="495" cy="320" rx="150" ry="130" fill="#e67e22" stroke="#000000"
+           stroke-width="8" pikto:name="Hlava" />
+
+  <ellipse cx="440" cy="300" rx="26" ry="30" fill="#2ecc71" stroke="#000000"
+           stroke-width="6" pikto:name="Oko leve" />
+  <ellipse cx="550" cy="300" rx="26" ry="30" fill="#2ecc71" stroke="#000000"
+           stroke-width="6" pikto:name="Oko prave" />
+  <path d="M 478 360 L 512 360 L 495 382 Z" fill="#c0392b" stroke="#000000"
+        stroke-width="6" stroke-linejoin="round" pikto:name="Nos" />
+  <path d="M 495 382 q -30 34 -56 10 M 495 382 q 30 34 56 10" fill="none"
+        stroke="#000000" stroke-width="7" stroke-linecap="round" pikto:name="Usta" />
+  <path d="M 380 340 L 280 320 M 380 366 L 285 372" fill="none" stroke="#000000"
+        stroke-width="6" stroke-linecap="round" pikto:name="Vousky leve" />
+  <path d="M 610 340 L 710 320 M 610 366 L 705 372" fill="none" stroke="#000000"
+        stroke-width="6" stroke-linecap="round" pikto:name="Vousky prave" />
+
+  <text x="512" y="944" text-anchor="middle" font-family="Arial" font-size="96"
+        font-weight="bold" fill="#000000" pikto:name="Popisek"
+        pikto:role="caption">KOCKA</text>
+</svg>

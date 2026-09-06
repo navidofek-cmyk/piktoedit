@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:pikto="https://github.com/aac/piktoedit"
+     width="1024" height="1024" viewBox="0 0 1024 1024" version="1.1" pikto:grid="16">
+  <title>Oblicej - dily</title>
+  <rect x="0" y="0" width="1024" height="1024" fill="#ffffff" pikto:role="background" />
+
+  <!-- oci -->
+  <ellipse cx="130" cy="130" rx="62" ry="44" fill="#ffffff" stroke="#000000"
+           stroke-width="8" pikto:name="Oko ovalne" />
+  <ellipse cx="130" cy="130" rx="22" ry="22" fill="#2c3e50" stroke="none"
+           pikto:name="Zornice ovalna" />
+  <ellipse cx="320" cy="130" rx="46" ry="46" fill="#ffffff" stroke="#000000"
+           stroke-width="8" pikto:name="Oko kulate" />
+  <ellipse cx="320" cy="130" rx="18" ry="18" fill="#2c3e50" stroke="none"
+           pikto:name="Zornice kulata" />
+  <path d="M 460 130 q 62 46 124 0" fill="none" stroke="#000000" stroke-width="10"
+        stroke-linecap="round" pikto:name="Oko zavrene" />
+  <path d="M 660 116 q 62 -38 124 0" fill="none" stroke="#000000" stroke-width="12"
+        stroke-linecap="round" pikto:name="Oboci klenute" />
+  <path d="M 850 120 L 970 120" fill="none" stroke="#000000" stroke-width="12"
+        stroke-linecap="round" pikto:name="Oboci rovne" />
+
+  <!-- nos a usta -->
+  <path d="M 140 280 L 140 344 q 0 24 28 24" fill="none" stroke="#000000"
+        stroke-width="8" stroke-linecap="round" stroke-linejoin="round"
+        pikto:name="Nos jednoduchy" />
+  <ellipse cx="320" cy="340" rx="28" ry="22" fill="#f6c9a0" stroke="#000000"
+           stroke-width="8" pikto:name="Nos kulaty" />
+  <path d="M 452 306 q 70 76 140 0" fill="none" stroke="#000000" stroke-width="12"
+        stroke-linecap="round" pikto:name="Usta usmev" />
+  <path d="M 660 340 L 790 340" fill="none" stroke="#000000" stroke-width="12"
+        stroke-linecap="round" pikto:name="Usta rovna" />
+  <ellipse cx="912" cy="340" rx="56" ry="38" fill="#c0392b" stroke="#000000"
+           stroke-width="8" pikto:name="Usta otevrena" />
+
+  <!-- usi a vlasy -->
+  <path d="M 160 490 c -52 4 -52 96 0 100" fill="#f6c9a0" stroke="#000000"
+        stroke-width="8" stroke-linejoin="round" pikto:name="Ucho leve" />
+  <path d="M 280 490 c 52 4 52 96 0 100" fill="#f6c9a0" stroke="#000000"
+        stroke-width="8" stroke-linejoin="round" pikto:name="Ucho prave" />
+  <path d="M 420 590 c 0 -130 220 -130 220 0 c -26 -66 -194 -66 -220 0 Z"
+        fill="#8b5a2b" stroke="#000000" stroke-width="8" stroke-linejoin="round"
+        pikto:name="Vlasy kratke" />
+  <path d="M 700 600 c 0 -140 240 -140 240 0 c 0 60 -18 90 -18 90 c 10 -70 -4 -120 -22 -140
+           c -40 30 -120 30 -160 0 c -18 20 -32 70 -22 140 c 0 0 -18 -30 -18 -90 Z"
+        fill="#5b3a1a" stroke="#000000" stroke-width="8" stroke-linejoin="round"
+        pikto:name="Vlasy dlouhe" />
+
+  <!-- hlavy a krk -->
+  <ellipse cx="180" cy="850" rx="112" ry="126" fill="#f6c9a0" stroke="#000000"
+           stroke-width="8" pikto:name="Hlava ovalna" />
+  <ellipse cx="500" cy="850" rx="120" ry="120" fill="#f6c9a0" stroke="#000000"
+           stroke-width="8" pikto:name="Hlava kulata" />
+  <rect x="740" y="790" width="48" height="120" rx="14" ry="14" fill="#f6c9a0"
+        stroke="#000000" stroke-width="8" pikto:name="Krk" />
+  <path d="M 860 780 q 60 -40 120 0 L 980 960 L 860 960 Z" fill="#3498db"
+        stroke="#000000" stroke-width="8" stroke-linejoin="round"
+        pikto:name="Ramena" />
+</svg>

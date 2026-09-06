@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:pikto="https://github.com/aac/piktoedit"
+     width="1024" height="1024" viewBox="0 0 1024 1024" version="1.1" pikto:grid="16">
+  <title>Zakladni tvary</title>
+  <rect x="0" y="0" width="1024" height="1024" fill="#ffffff" pikto:role="background" />
+
+  <rect x="96" y="128" width="240" height="180" rx="0" ry="0"
+        fill="#ffffff" stroke="#000000" stroke-width="8" stroke-linejoin="round"
+        pikto:name="Obdelnik" />
+  <rect x="400" y="128" width="240" height="180" rx="40" ry="40"
+        fill="#ffffff" stroke="#000000" stroke-width="8" stroke-linejoin="round"
+        pikto:name="Zaobleny obdelnik" />
+  <ellipse cx="824" cy="218" rx="120" ry="90"
+           fill="#ffffff" stroke="#000000" stroke-width="8" pikto:name="Elipsa" />
+
+  <path d="M 96 560 L 216 380 L 336 560 Z"
+        fill="#ffffff" stroke="#000000" stroke-width="8" stroke-linejoin="round"
+        pikto:name="Trojuhelnik" />
+  <path d="M 520 380 L 640 470 L 594 610 L 446 610 L 400 470 Z"
+        fill="#ffffff" stroke="#000000" stroke-width="8" stroke-linejoin="round"
+        pikto:name="Petiuhelnik" />
+  <path d="M 704 470 C 704 400 824 400 824 470 C 824 400 944 400 944 470
+           C 944 550 824 610 824 610 C 824 610 704 550 704 470 Z"
+        fill="#e74c3c" stroke="#000000" stroke-width="8" stroke-linejoin="round"
+        pikto:name="Srdce" />
+
+  <path d="M 96 760 L 336 760" fill="none" stroke="#000000" stroke-width="8"
+        stroke-linecap="round" pikto:name="Cara" />
+  <path d="M 400 860 L 460 760 L 520 860 L 580 760 L 640 860"
+        fill="none" stroke="#000000" stroke-width="8" stroke-linecap="round"
+        stroke-linejoin="round" pikto:name="Lomena cara" />
+  <path d="M 704 810 C 704 730 824 730 824 810 C 824 890 944 890 944 810"
+        fill="none" stroke="#000000" stroke-width="8" stroke-linecap="round"
+        pikto:name="Krivka" />
+</svg>

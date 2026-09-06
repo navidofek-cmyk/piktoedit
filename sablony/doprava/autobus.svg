@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:pikto="https://github.com/aac/piktoedit"
+     width="1024" height="1024" viewBox="0 0 1024 1024" version="1.1" pikto:grid="16">
+  <title>Autobus</title>
+  <rect x="0" y="0" width="1024" height="1024" fill="#ffffff" pikto:role="background" />
+
+  <rect x="120" y="250" width="790" height="400" rx="50" ry="50" fill="#f1c40f"
+        stroke="#000000" stroke-width="8" stroke-linejoin="round" pikto:name="Karoserie" />
+  <rect x="170" y="310" width="150" height="120" rx="14" ry="14" fill="#c9ced6"
+        stroke="#000000" stroke-width="8" pikto:name="Okno 1" />
+  <rect x="350" y="310" width="150" height="120" rx="14" ry="14" fill="#c9ced6"
+        stroke="#000000" stroke-width="8" pikto:name="Okno 2" />
+  <rect x="530" y="310" width="150" height="120" rx="14" ry="14" fill="#c9ced6"
+        stroke="#000000" stroke-width="8" pikto:name="Okno 3" />
+  <rect x="710" y="310" width="150" height="230" rx="14" ry="14" fill="#c9ced6"
+        stroke="#000000" stroke-width="8" pikto:name="Celni sklo" />
+  <rect x="170" y="470" width="120" height="180" rx="14" ry="14" fill="#e6e8ec"
+        stroke="#000000" stroke-width="8" pikto:name="Dvere" />
+  <path d="M 230 470 L 230 650" fill="none" stroke="#000000" stroke-width="6"
+        pikto:name="Deleni dveri" />
+  <rect x="850" y="560" width="60" height="50" rx="14" ry="14" fill="#ffffff"
+        stroke="#000000" stroke-width="8" pikto:name="Svetlo" />
+
+  <ellipse cx="300" cy="670" rx="80" ry="80" fill="#3f3f46" stroke="#000000"
+           stroke-width="8" pikto:name="Kolo prednji" />
+  <ellipse cx="300" cy="670" rx="32" ry="32" fill="#c9ced6" stroke="#000000"
+           stroke-width="8" pikto:name="Disk prednji" />
+  <ellipse cx="740" cy="670" rx="80" ry="80" fill="#3f3f46" stroke="#000000"
+           stroke-width="8" pikto:name="Kolo zadni" />
+  <ellipse cx="740" cy="670" rx="32" ry="32" fill="#c9ced6" stroke="#000000"
+           stroke-width="8" pikto:name="Disk zadni" />
+
+  <text x="512" y="944" text-anchor="middle" font-family="Arial" font-size="88"
+        font-weight="bold" fill="#000000" pikto:name="Popisek"
+        pikto:role="caption">AUTOBUS</text>
+</svg>
