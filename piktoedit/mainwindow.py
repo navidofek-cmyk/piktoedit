@@ -386,7 +386,9 @@ class MainWindow(QMainWindow):
 
         self.templates = TemplatePanel(TEMPLATE_DIR, self)
         self.templates.insert_requested.connect(self.insert_template)
+        self.templates.part_requested.connect(self.insert_part)
         self.templates.new_from_template.connect(self.new_from_template)
+        self.view.part_dropped.connect(self.insert_part)
 
         self.caption_panel = CaptionPanel(self)
         self.caption_panel.apply_requested.connect(self.apply_caption)
@@ -732,18 +734,45 @@ class MainWindow(QMainWindow):
     # Sablony a predloha
     # ------------------------------------------------------------------
     def insert_template(self, path: str) -> None:
+        self.insert_part(path, -1)
+
+    def insert_part(self, path: str, index: int = -1,
+                    scene_pos: QPointF | None = None) -> None:
+        """Vlozi celou sablonu, nebo jen jeden jeji dil."""
         try:
             _, shapes = svgio.load(Path(path))
         except Exception as error:  # noqa: BLE001
             QMessageBox.critical(self, "Nelze nacist sablonu", f"{path}\n\n{error}")
             return
+
+        whole = index < 0
+        if not whole:
+            if not 0 <= index < len(shapes):
+                return
+            shapes = [shapes[index]]
+        if not shapes:
+            return
+
+        if scene_pos is None and not whole:
+            # Bez pretazeni miri dil doprostred toho, co je prave videt.
+            scene_pos = self.view.mapToScene(self.view.viewport().rect().center())
+
+        if scene_pos is not None:
+            bounds = QRectF()
+            for shape in shapes:
+                mapped = shape.mapToScene(shape.local_rect()).boundingRect()
+                bounds = mapped if bounds.isNull() else bounds.united(mapped)
+            delta = scene_pos - bounds.center()
+            for shape in shapes:
+                shape.setPos(shape.pos() + delta)
+
         self.scene.clearSelection()
         base = self.scene.next_z()
-        for index, shape in enumerate(shapes):
-            shape.setZValue(base + index)
+        for order, shape in enumerate(shapes):
+            shape.setZValue(base + order)
             self.scene.addItem(shape)
             shape.setSelected(True)
-        self.snapshot("Vlozeni sablony")
+        self.snapshot("Vlozeni sablony" if whole else "Vlozeni dilu")
 
     def new_from_template(self, path: str) -> None:
         if not self._confirm_discard():

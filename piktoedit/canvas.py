@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 from typing import Callable
 
@@ -20,6 +21,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QGraphicsScene, QGraphicsView
 
 from .nodes import erase_from_outline, erase_from_stroke
+from .panels import PART_MIME
 from .regionfill import find_region, image_to_document, raster_scale, render_plain
 from .shapes import PathShape, ReferenceImage, ShapeMixin, TextShape
 from .style import Style
@@ -161,6 +163,8 @@ class CanvasView(QGraphicsView):
     style_picked = Signal()
     #: Hlaska pro stavovy radek.
     message = Signal(str)
+    #: Na platno nekdo pretahl sablonu nebo jeji dil: soubor, index, misto.
+    part_dropped = Signal(str, int, QPointF)
 
     def __init__(self, scene: CanvasScene, parent=None):
         super().__init__(scene, parent)
@@ -172,6 +176,7 @@ class CanvasView(QGraphicsView):
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
         self.setDragMode(QGraphicsView.DragMode.NoDrag)
         self.setMouseTracking(True)
+        self.setAcceptDrops(True)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
@@ -510,6 +515,34 @@ class CanvasView(QGraphicsView):
         self.fitInView(self.canvas_scene.document.rect().adjusted(-24, -24, 24, 24),
                        Qt.AspectRatioMode.KeepAspectRatio)
         self.zoom_changed.emit(self.scale_factor())
+
+    # -- pretazeni ze seznamu sablon --------------------------------------
+    def dragEnterEvent(self, event) -> None:
+        if event.mimeData().hasFormat(PART_MIME):
+            event.acceptProposedAction()
+            return
+        super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event) -> None:
+        if event.mimeData().hasFormat(PART_MIME):
+            event.acceptProposedAction()
+            return
+        super().dragMoveEvent(event)
+
+    def dropEvent(self, event) -> None:
+        if not event.mimeData().hasFormat(PART_MIME):
+            super().dropEvent(event)
+            return
+        try:
+            payload = json.loads(bytes(event.mimeData().data(PART_MIME)).decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return
+        path = payload.get("file") or ""
+        index = payload.get("index")
+        scene_pos = self.mapToScene(event.position().toPoint())
+        if path:
+            self.part_dropped.emit(path, -1 if index is None else int(index), scene_pos)
+        event.acceptProposedAction()
 
     # -- udalosti mysi ----------------------------------------------------
     def _positions(self, event) -> tuple[QPointF, QPointF]:

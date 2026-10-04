@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-from PySide6.QtCore import QPointF, QRectF, QSize, Qt, Signal
+from PySide6.QtCore import QByteArray, QMimeData, QPointF, QRectF, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -679,16 +680,52 @@ CATEGORY_ORDER = ["oblicej", "postavy", "zvirata", "doprava", "prostredi",
                   "karty", "tvary", ""]
 
 
+#: Format pro tazeni sablony nebo dilu na platno.
+PART_MIME = "application/x-piktoedit-part"
+
+#: Role, ve kterych si polozky seznamu nesou, co maji vlozit.
+ROLE_FILE = Qt.ItemDataRole.UserRole
+ROLE_INDEX = Qt.ItemDataRole.UserRole + 1
+
+
+class DragListWidget(QListWidget):
+    """Seznam, ze ktereho jde polozku pretahnout na platno."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setDragEnabled(True)
+        self.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
+        self.setDefaultDropAction(Qt.DropAction.CopyAction)
+
+    def mimeData(self, items):  # type: ignore[override]
+        data = QMimeData()
+        for item in items:
+            payload = {
+                "file": item.data(ROLE_FILE),
+                "index": item.data(ROLE_INDEX),
+            }
+            data.setData(PART_MIME, QByteArray(json.dumps(payload).encode("utf-8")))
+            break
+        return data
+
+
 class TemplatePanel(QWidget):
-    """Sablony s nahledy, rozdelene do kategorii podle podslozek."""
+    """Sablony s nahledy.
+
+    Prvni uroven jsou soubory podle kategorii (podslozek), druha jednotlive
+    dily uvnitr sablony. Vlozit jde oboji, bud tlacitkem, nebo pretazenim
+    primo na misto na platne.
+    """
 
     insert_requested = Signal(str)
+    part_requested = Signal(str, int)
     new_from_template = Signal(str)
 
     def __init__(self, folder: Path, parent=None):
         super().__init__(parent)
         self.folder = Path(folder)
         self._files: dict[str, list[Path]] = {}
+        self._opened: Path | None = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(6, 6, 6, 6)
@@ -697,7 +734,15 @@ class TemplatePanel(QWidget):
         self.category_combo = QComboBox(self)
         layout.addWidget(self.category_combo)
 
-        self.list = QListWidget(self)
+        self.back_button = QPushButton("← Zpet na sablony", self)
+        self.back_button.setVisible(False)
+        layout.addWidget(self.back_button)
+
+        self.title_label = QLabel(self)
+        self.title_label.setWordWrap(True)
+        layout.addWidget(self.title_label)
+
+        self.list = DragListWidget(self)
         self.list.setViewMode(QListWidget.ViewMode.IconMode)
         self.list.setIconSize(QSize(104, 104))
         self.list.setGridSize(QSize(126, 140))
@@ -714,18 +759,66 @@ class TemplatePanel(QWidget):
         layout.addWidget(self.new_button)
         layout.addWidget(self.reload_button)
 
-        self.list.itemDoubleClicked.connect(
-            lambda item: self.insert_requested.emit(item.data(Qt.ItemDataRole.UserRole)))
+        self.list.itemDoubleClicked.connect(self._activate)
         self.category_combo.currentIndexChanged.connect(lambda _: self._show_category())
-        self.insert_button.clicked.connect(lambda: self._emit(self.insert_requested))
-        self.new_button.clicked.connect(lambda: self._emit(self.new_from_template))
+        self.back_button.clicked.connect(self._show_category)
+        self.insert_button.clicked.connect(self._insert_current)
+        self.new_button.clicked.connect(self._new_from_current)
         self.reload_button.clicked.connect(self.reload)
         self.reload()
 
-    def _emit(self, signal: Signal) -> None:
+    # -- ovladani ---------------------------------------------------------
+    def _activate(self, item: QListWidgetItem) -> None:
+        index = item.data(ROLE_INDEX)
+        path = item.data(ROLE_FILE)
+        if index is not None and index >= 0:
+            self.part_requested.emit(path, index)
+        else:
+            self.open_template(Path(path))
+
+    def _insert_current(self) -> None:
+        item = self.list.currentItem()
+        if item is None:
+            return
+        index = item.data(ROLE_INDEX)
+        if index is not None and index >= 0:
+            self.part_requested.emit(item.data(ROLE_FILE), index)
+        else:
+            self.insert_requested.emit(item.data(ROLE_FILE))
+
+    def _new_from_current(self) -> None:
         item = self.list.currentItem()
         if item is not None:
-            signal.emit(item.data(Qt.ItemDataRole.UserRole))
+            self.new_from_template.emit(item.data(ROLE_FILE))
+        elif self._opened is not None:
+            self.new_from_template.emit(str(self._opened))
+
+    def open_template(self, path: Path) -> None:
+        """Rozbali sablonu na jednotlive dily."""
+        from .preview import part_preview, template_parts
+
+        parts = template_parts(path)
+        if not parts:
+            self.insert_requested.emit(str(path))
+            return
+
+        self._opened = Path(path)
+        self.list.clear()
+        self.back_button.setVisible(True)
+        self.title_label.setText(
+            f"Dily ze sablony {path.stem.replace('_', ' ')} "
+            f"({len(parts)}) - dvojklik vlozi, nebo pretahni na platno")
+
+        for index, name in parts:
+            item = QListWidgetItem(name)
+            item.setData(ROLE_FILE, str(path))
+            item.setData(ROLE_INDEX, index)
+            item.setToolTip(f"{name} - {path.name}")
+            item.setTextAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+            pixmap = part_preview(path, index)
+            if pixmap is not None:
+                item.setIcon(QIcon(pixmap))
+            self.list.addItem(item)
 
     def reload(self) -> None:
         self._files = {}
@@ -755,7 +848,13 @@ class TemplatePanel(QWidget):
         from .preview import template_preview
 
         selected = self.category_combo.currentData()
+        self._opened = None
+        self.back_button.setVisible(False)
+        self.title_label.setText(
+            "Dvojklik rozbali sablonu na dily. Sablonu i dil lze pretahnout "
+            "primo na platno.")
         self.list.clear()
+
         if selected is None:
             files = [file for key in self._files for file in self._files[key]]
             files.sort(key=lambda item: (str(item.parent), item.name))
@@ -764,7 +863,8 @@ class TemplatePanel(QWidget):
 
         for file in files:
             item = QListWidgetItem(file.stem.replace("_", " "))
-            item.setData(Qt.ItemDataRole.UserRole, str(file))
+            item.setData(ROLE_FILE, str(file))
+            item.setData(ROLE_INDEX, -1)
             item.setToolTip(str(file))
             item.setTextAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
             pixmap = template_preview(file)

@@ -191,8 +191,24 @@ jako s kazdym jinym objektem.
 
 ## Sablony
 
-Zalozka **Sablony** ukazuje nahledy a nahore se prepina kategorie. Kategorie
-je proste podslozka v `sablony/`:
+Zalozka **Sablony** ma dve urovne:
+
+1. **Sablony** - nahledy souboru, nahore se prepina kategorie.
+2. **Dily** - dvojklik na sablonu ji rozbali na jednotlive pojmenovane
+   objekty, kazdy s vlastnim nahledem. Tlacitkem `← Zpet na sablony` se
+   vratite o uroven vys.
+
+Vlozit jde oboji:
+
+- **dvojklik** vlozi dil doprostred toho, co prave vidite, a rovnou ho vybere,
+- **tazeni mysi** z panelu polozi sablonu nebo dil presne tam, kam ho pustite,
+- tlacitko `Vlozit do kresby` pracuje s tim, co je v seznamu vybrane.
+
+Takze obliceje se skladaji tak, ze se z `oblicej_dily` pretahne oko, druhe oko,
+nos a usta rovnou na spravna mista. Cele piktogramy jako `kocka` nebo `auto`
+ma smysl vkladat celé.
+
+Kategorie je proste podslozka v `sablony/`:
 
 | Kategorie | Obsah |
 |---|---|
