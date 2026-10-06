@@ -617,6 +617,13 @@ class CanvasView(QGraphicsView):
             return
         super().keyPressEvent(event)
 
+    def leaveEvent(self, event) -> None:
+        # Kdyz kurzor opusti platno, nesmi po nem zustat viset nahled nastroje.
+        if self.tool is not None:
+            self.tool.clear_hover()
+            self.viewport().update()
+        super().leaveEvent(event)
+
     def keyReleaseEvent(self, event) -> None:
         if event.key() == Qt.Key.Key_Space and not event.isAutoRepeat():
             self._space_down = False

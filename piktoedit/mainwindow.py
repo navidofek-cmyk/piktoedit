@@ -24,10 +24,12 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
+    QFrame,
     QInputDialog,
     QLabel,
     QMainWindow,
     QMessageBox,
+    QScrollArea,
     QTabWidget,
     QToolBar,
     QVBoxLayout,
@@ -333,6 +335,7 @@ class MainWindow(QMainWindow):
         self.spline_combo.currentIndexChanged.connect(self._set_spline_mode)
         top.addWidget(self.spline_combo)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, top)
+        self.top_toolbar = top
 
         self.addToolBarBreak(Qt.ToolBarArea.TopToolBarArea)
         shapes_bar = QToolBar("Krivky", self)
@@ -346,13 +349,41 @@ class MainWindow(QMainWindow):
             shapes_bar.addAction(action)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, shapes_bar)
 
+        for bar in (self.top_toolbar, shapes_bar):
+            bar.setStyleSheet(
+                "QToolButton { color: #14181d; padding: 4px 9px; }"
+                "QToolButton:disabled { color: #9aa1aa; }"
+                "QToolButton:hover { background: #d8e2ef; border-radius: 4px; }")
+
         tools = QToolBar("Nastroje", self)
         tools.setMovable(False)
         tools.setOrientation(Qt.Orientation.Vertical)
         tools.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        # Vychozi styl kresli popisky slabe a aktivni nastroj je skoro
+        # k nerozeznani. Cerny text a modre zvyrazneni to resi.
+        tools.setStyleSheet("""
+            QToolBar { background: #eceff3; border-right: 1px solid #c3c9d2;
+                       padding: 4px; spacing: 2px; }
+            QToolButton { color: #14181d; font-size: 13px; text-align: left;
+                          padding: 7px 14px; min-width: 104px;
+                          border: 1px solid transparent; border-radius: 4px; }
+            QToolButton:hover { background: #d8e2ef; border-color: #a9bcd4; }
+            QToolButton:checked { background: #1668c1; color: #ffffff;
+                                  font-weight: bold; border-color: #0d4b8f; }
+            QToolButton:checked:hover { background: #1b74d4; }
+        """)
         for key, *_ in TOOL_BUTTONS:
             tools.addAction(self.tool_actions[key])
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, tools)
+
+    def _scrollable(self, widget: QWidget) -> QScrollArea:
+        """Panel do rolovaci plochy, aby okno slo zmensit i na nizsi obrazovku."""
+        area = QScrollArea(self)
+        area.setWidget(widget)
+        area.setWidgetResizable(True)
+        area.setFrameShape(QFrame.Shape.NoFrame)
+        area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        return area
 
     def _build_docks(self) -> None:
         self.properties = PropertiesPanel(self.view, self)
@@ -370,7 +401,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.properties, 1)
 
         style_dock = QDockWidget("Vlastnosti", self)
-        style_dock.setWidget(style_widget)
+        style_dock.setWidget(self._scrollable(style_widget))
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, style_dock)
 
         self.layers = LayersPanel(self.view, self)
@@ -395,10 +426,10 @@ class MainWindow(QMainWindow):
         self.caption_panel.remove_requested.connect(self.remove_caption)
 
         tabs = QTabWidget(self)
-        tabs.addTab(self.caption_panel, "Popisek")
+        tabs.addTab(self._scrollable(self.caption_panel), "Popisek")
         tabs.addTab(self.layers, "Objekty")
-        tabs.addTab(self.reference_panel, "Predloha")
-        tabs.addTab(self.templates, "Sablony")
+        tabs.addTab(self._scrollable(self.reference_panel), "Predloha")
+        tabs.addTab(self._scrollable(self.templates), "Sablony")
         self.side_tabs = tabs
 
         side_dock = QDockWidget("Kresba", self)
@@ -408,8 +439,13 @@ class MainWindow(QMainWindow):
     def _build_statusbar(self) -> None:
         self.position_label = QLabel("0; 0", self)
         self.zoom_label = QLabel("100 %", self)
+        self.tool_label = QLabel(self)
+        self.tool_label.setStyleSheet(
+            "color: #ffffff; background: #1668c1; border-radius: 4px;"
+            " padding: 2px 10px; font-weight: bold;")
         self.hint_label = QLabel("Kolecko = zoom, prostredni tlacitko nebo mezernik = posun", self)
         bar = self.statusBar()
+        bar.addWidget(self.tool_label)
         bar.addWidget(self.hint_label, 1)
         bar.addPermanentWidget(self.position_label)
         bar.addPermanentWidget(self.zoom_label)
@@ -468,6 +504,8 @@ class MainWindow(QMainWindow):
         action = self.tool_actions.get(name)
         if action is not None and not action.isChecked():
             action.setChecked(True)
+        label = next((title for key, title, *_ in TOOL_BUTTONS if key == name), name)
+        self.tool_label.setText(f"Nastroj: {label}")
 
     def _after_tool(self) -> None:
         pending = self.view.pending_text_edit
@@ -575,7 +613,14 @@ class MainWindow(QMainWindow):
 
     def convert_to_path(self, shape: ShapeMixin | None = None) -> None:
         targets = [shape] if isinstance(shape, ShapeMixin) else self.scene.selected_shapes()
+        if not targets:
+            self.statusBar().showMessage(
+                "Nejdriv vyber tvar, ktery se ma prevest na krivku - sipkou (V) "
+                "na nej klikni.", 6000)
+            return None
+
         converted = []
+        changed = 0
         for item in targets:
             if isinstance(item, PathShape):
                 converted.append(item)
@@ -584,12 +629,24 @@ class MainWindow(QMainWindow):
             self.scene.removeItem(item)
             self.scene.addItem(replacement)
             converted.append(replacement)
-        if not converted:
-            return
+            changed += 1
+
         self.scene.clearSelection()
         for item in converted:
             item.setSelected(True)
+
+        if not changed:
+            self.statusBar().showMessage(
+                "Tohle uz krivka je. Uzly se upravuji nastrojem Uzly (N).", 6000)
+            return converted[0] if converted else None
+
+        nodes = sum(len(part.nodes)
+                    for item in converted if isinstance(item, PathShape)
+                    for part in path_to_subpaths(item.path()))
         self.snapshot("Prevod na krivku")
+        self.statusBar().showMessage(
+            f"Prevedeno na krivku: {changed} objektu, celkem {nodes} uzlu. "
+            f"Uprav je nastrojem Uzly (N).", 6000)
         return converted[0] if converted else None
 
     def _convert_and_edit(self, shape: ShapeMixin) -> None:
@@ -892,9 +949,18 @@ class MainWindow(QMainWindow):
             shape.setPos(shape.pos() + delta)
         self.snapshot("Zarovnani")
 
+    def show_tab(self, panel: QWidget) -> None:
+        """Prepne na zalozku s danym panelem, i kdyz je v rolovaci plose."""
+        for index in range(self.side_tabs.count()):
+            widget = self.side_tabs.widget(index)
+            if widget is panel or (isinstance(widget, QScrollArea)
+                                   and widget.widget() is panel):
+                self.side_tabs.setCurrentIndex(index)
+                return
+
     def focus_caption(self) -> None:
         """Ctrl+L skoci do policka s popiskem pod obrazkem."""
-        self.side_tabs.setCurrentWidget(self.caption_panel)
+        self.show_tab(self.caption_panel)
         self.caption_panel.text_edit.setFocus()
         self.caption_panel.text_edit.selectAll()
 

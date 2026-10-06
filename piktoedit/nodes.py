@@ -252,23 +252,53 @@ def split_cubic(p0: QPointF, c1: QPointF, c2: QPointF, p3: QPointF, t: float):
     return (a, d, point), (e, c, point)
 
 
+def point_on_segment(start: Node, end: Node, t: float) -> QPointF:
+    """Bod segmentu v parametru t."""
+    if start.handle_out is None and end.handle_in is None:
+        return start.point + (end.point - start.point) * t
+    return _cubic_at(start.point, start.handle_out or start.point,
+                     end.handle_in or end.point, end.point, t)
+
+
 def nearest_on_segment(start: Node, end: Node, target: QPointF,
-                       samples: int = 40) -> tuple[float, float]:
-    """Vrati parametr t a vzdalenost nejblizsiho bodu segmentu."""
-    has_curve = start.handle_out is not None or end.handle_in is not None
-    best_t, best_distance = 0.0, float("inf")
+                       samples: int = 24) -> tuple[float, float]:
+    """Vrati parametr t a vzdalenost nejblizsiho bodu segmentu.
+
+    U usecky se pocita presna kolma projekce. U kubiky se hrube vzorkovani
+    jeste zpresni pulenim, protoze samotne vzorkovani dava na dlouhem
+    segmentu chybu i deset pixelu a prusecik by pak vypadal jako mimo
+    krivku.
+    """
+    if start.handle_out is None and end.handle_in is None:
+        ax, ay = start.point.x(), start.point.y()
+        dx, dy = end.point.x() - ax, end.point.y() - ay
+        length = dx * dx + dy * dy
+        if length < 1e-12:
+            return 0.0, distance(start.point, target)
+        t = ((target.x() - ax) * dx + (target.y() - ay) * dy) / length
+        t = max(0.0, min(1.0, t))
+        return t, distance(QPointF(ax + dx * t, ay + dy * t), target)
+
+    def at(value: float) -> QPointF:
+        return _cubic_at(start.point, start.handle_out or start.point,
+                         end.handle_in or end.point, end.point, value)
+
+    best_t, best = 0.0, float("inf")
     for index in range(samples + 1):
         t = index / samples
-        if has_curve:
-            point = _cubic_at(start.point, start.handle_out or start.point,
-                              end.handle_in or end.point, end.point, t)
-        else:
-            point = start.point + (end.point - start.point) * t
-        current = distance(point, target)
-        if current < best_distance:
-            best_distance = current
-            best_t = t
-    return best_t, best_distance
+        current = distance(at(t), target)
+        if current < best:
+            best, best_t = current, t
+
+    step = 1.0 / samples
+    for _ in range(8):
+        step *= 0.5
+        for t in (best_t - step, best_t + step):
+            t = max(0.0, min(1.0, t))
+            current = distance(at(t), target)
+            if current < best:
+                best, best_t = current, t
+    return best_t, best
 
 
 def _cubic_at(p0: QPointF, c1: QPointF, c2: QPointF, p3: QPointF, t: float) -> QPointF:
@@ -376,21 +406,44 @@ def erase_from_outline(path: QPainterPath, area: QPainterPath) -> QPainterPath:
     return path.subtracted(area).simplified()
 
 
-def erase_from_stroke(path: QPainterPath, area: QPainterPath) -> QPainterPath:
-    """Rozdeli caru tam, kde ji guma prejela."""
+def erase_from_stroke(path: QPainterPath, area: QPainterPath,
+                      step: float = 2.0) -> QPainterPath:
+    """Rozdeli caru tam, kde ji guma prejela.
+
+    Cara se nejdriv prevzorkuje po malych krocich. Rovna cara ma jen dva
+    body, takze bez toho by guma uprostred nemela co odebrat.
+    """
     result = QPainterPath()
     for polygon in path.toSubpathPolygons():
+        points = _resample([QPointF(point) for point in polygon], step)
         run: list[QPointF] = []
-        for point in polygon:
+        for point in points:
             if area.contains(point):
                 if len(run) > 1:
-                    _append_polyline(result, run)
+                    _append_polyline(result, simplify_points(run, 0.3))
                 run = []
             else:
-                run.append(QPointF(point))
+                run.append(point)
         if len(run) > 1:
-            _append_polyline(result, run)
+            _append_polyline(result, simplify_points(run, 0.3))
     return result
+
+
+def _resample(points: list[QPointF], step: float) -> list[QPointF]:
+    """Doplni body tak, aby mezi nimi nebyly vetsi mezery nez ``step``."""
+    if len(points) < 2 or step <= 0:
+        return list(points)
+    dense: list[QPointF] = []
+    for start, end in zip(points, points[1:]):
+        dense.append(start)
+        length = distance(start, end)
+        if length > step:
+            pieces = int(length / step)
+            for index in range(1, pieces):
+                t = index / pieces
+                dense.append(start + (end - start) * t)
+    dense.append(points[-1])
+    return dense
 
 
 def _append_polyline(path: QPainterPath, points: list[QPointF]) -> None:
@@ -414,27 +467,161 @@ def flatten_segments(path: QPainterPath, epsilon: float = 0.4) -> list[QLineF]:
     return segments
 
 
-def path_intersections(first: QPainterPath, second: QPainterPath) -> list[QPointF]:
-    """Body, ve kterych se dve krivky protinaji."""
-    if not first.boundingRect().intersects(second.boundingRect()):
+def segment_gap(line: QLineF, other: QLineF) -> tuple[float, QPointF]:
+    """Nejmensi vzdalenost dvou usecek a nejblizsi bod na prvni z nich.
+
+    Bod se vraci na prvni usecce zamerne: to je ta, ktera se bude rezat,
+    takze rez vyjde presne na ni a ne nekde vedle.
+    """
+    p1 = line.p1()
+    d1 = line.p2() - p1
+    p2 = other.p1()
+    d2 = other.p2() - p2
+    r = p1 - p2
+
+    def dot(a: QPointF, b: QPointF) -> float:
+        return a.x() * b.x() + a.y() * b.y()
+
+    def clamp(value: float) -> float:
+        return max(0.0, min(1.0, value))
+
+    a = dot(d1, d1)
+    e = dot(d2, d2)
+    f = dot(d2, r)
+
+    if a <= 1e-9 and e <= 1e-9:
+        return distance(p1, p2), QPointF(p1)
+    if a <= 1e-9:
+        s, t = 0.0, clamp(f / e)
+    else:
+        c = dot(d1, r)
+        if e <= 1e-9:
+            t, s = 0.0, clamp(-c / a)
+        else:
+            b = dot(d1, d2)
+            denominator = a * e - b * b
+            s = clamp((b * f - c * e) / denominator) if abs(denominator) > 1e-9 else 0.0
+            t = (b * s + f) / e
+            if t < 0.0:
+                t, s = 0.0, clamp(-c / a)
+            elif t > 1.0:
+                t, s = 1.0, clamp((b - c) / a)
+
+    near_first = p1 + d1 * s
+    near_second = p2 + d2 * t
+    return distance(near_first, near_second), near_first
+
+
+def _crossing_angle(line: QLineF, other: QLineF) -> float:
+    """Uhel mezi useckami v rozsahu 0 az 90 stupnu."""
+    angle = abs(line.angleTo(other)) % 180.0
+    return 180.0 - angle if angle > 90.0 else angle
+
+
+def path_intersections(first: QPainterPath, second: QPainterPath,
+                       tolerance: float = 0.0) -> list[QPointF]:
+    """Body, ve kterych se dve krivky protinaji.
+
+    ``tolerance`` povoli i tesne minuti. Rucne kreslene tahy se casto
+    opticky dotykaji jen diky sve tloustce, zatimco jejich osy se minou
+    o par pixelu.
+    """
+    # Svisla nebo vodorovna cara ma obalovy obdelnik nulove sirky a ten je
+    # pro Qt prazdny, takze by se krizeni s ni zahodilo uz tady. Odstup musi
+    # pokryt i toleranci, jinak by tesne minuti vypadlo driv, nez se na nej
+    # vubec dojde.
+    margin = max(1.0, tolerance)
+    box = first.boundingRect().adjusted(-margin, -margin, margin, margin)
+    other_box = second.boundingRect().adjusted(-margin, -margin, margin, margin)
+    if not box.intersects(other_box):
         return []
 
+    margin = max(0.5, tolerance)
+    merge = max(1.5, tolerance / 2.0)
     others = flatten_segments(second)
-    points: list[QPointF] = []
+    exact: list[QPointF] = []
+    near_misses: list[QPointF] = []
+
     for line in flatten_segments(first):
         x1, x2 = sorted((line.x1(), line.x2()))
         y1, y2 = sorted((line.y1(), line.y2()))
         for other in others:
-            if (max(other.x1(), other.x2()) < x1 - 0.5
-                    or min(other.x1(), other.x2()) > x2 + 0.5
-                    or max(other.y1(), other.y2()) < y1 - 0.5
-                    or min(other.y1(), other.y2()) > y2 + 0.5):
+            if (max(other.x1(), other.x2()) < x1 - margin
+                    or min(other.x1(), other.x2()) > x2 + margin
+                    or max(other.y1(), other.y2()) < y1 - margin
+                    or min(other.y1(), other.y2()) > y2 + margin):
                 continue
+
             kind, point = line.intersects(other)
             if kind == QLineF.IntersectionType.BoundedIntersection:
-                if all(distance(point, found) > 0.7 for found in points):
-                    points.append(QPointF(point))
+                # Dva roztresene tlustе tahy se v jednom viditelnem krizeni
+                # protnou klidne dvakrat par pixelu od sebe. Bez slouceni by
+                # mezi rezy zustal nepatrny drobek.
+                if all(distance(point, found) > merge for found in exact):
+                    exact.append(QPointF(point))
+                continue
+
+            if tolerance <= 0.0:
+                continue
+            gap, near = segment_gap(line, other)
+            # Soubezne tahy berem jako krizeni jen tehdy, kdyz se opravdu
+            # krizi, ne kdyz kousek bezi vedle sebe.
+            if gap <= tolerance and _crossing_angle(line, other) >= 20.0:
+                if all(distance(near, found) > tolerance for found in near_misses):
+                    near_misses.append(QPointF(near))
+
+    # Tesne minuti kousek vedle skutecneho pruseciku je tyz prusecik.
+    points = list(exact)
+    for near in near_misses:
+        if all(distance(near, found) > tolerance for found in points):
+            points.append(near)
     return points
+
+
+def self_intersections(path: QPainterPath) -> list[QPointF]:
+    """Mista, kde se krivka protina sama se sebou.
+
+    Sousedni usecky maji spolecny bod vzdycky, proto se preskakuji - a to
+    i prvni s posledni, pokud je cast uzavrena, jinak by kazde kolecko
+    vypadalo, ze se krizi samo se sebou.
+    """
+    groups: list[tuple[list[QLineF], bool]] = []
+    for polygon in path.toSubpathPolygons():
+        points = simplify_points([QPointF(point) for point in polygon], 0.4)
+        if len(points) < 2:
+            continue
+        closed = distance(points[0], points[-1]) < 0.05
+        segments = [QLineF(start, end) for start, end in zip(points, points[1:])
+                    if distance(start, end) > 1e-6]
+        if segments:
+            groups.append((segments, closed))
+
+    found: list[QPointF] = []
+
+    def consider(line: QLineF, other: QLineF) -> None:
+        if (max(other.x1(), other.x2()) < min(line.x1(), line.x2()) - 0.5
+                or min(other.x1(), other.x2()) > max(line.x1(), line.x2()) + 0.5
+                or max(other.y1(), other.y2()) < min(line.y1(), line.y2()) - 0.5
+                or min(other.y1(), other.y2()) > max(line.y1(), line.y2()) + 0.5):
+            return
+        kind, point = line.intersects(other)
+        if kind != QLineF.IntersectionType.BoundedIntersection:
+            return
+        if all(distance(point, kept) > 2.0 for kept in found):
+            found.append(QPointF(point))
+
+    for index, (segments, closed) in enumerate(groups):
+        count = len(segments)
+        for first in range(count):
+            for second in range(first + 2, count):
+                if closed and first == 0 and second == count - 1:
+                    continue
+                consider(segments[first], segments[second])
+        for other_segments, _ in groups[index + 1:]:
+            for line in segments:
+                for other in other_segments:
+                    consider(line, other)
+    return found
 
 
 def locate_point(subpaths: list[SubPath], target: QPointF) -> tuple[int, float, float] | None:
@@ -458,26 +645,54 @@ def locate_point(subpaths: list[SubPath], target: QPointF) -> tuple[int, float, 
     return best
 
 
+def subpath_length(subpath: SubPath) -> float:
+    """Priblizna delka casti krivky, pocitana po uzlech."""
+    nodes = subpath.nodes
+    if len(nodes) < 2:
+        return 0.0
+    pairs = list(zip(nodes, nodes[1:]))
+    if subpath.closed:
+        pairs.append((nodes[-1], nodes[0]))
+    return sum(distance(start.point, end.point) for start, end in pairs)
+
+
+def point_at(subpath: SubPath, value: float) -> QPointF:
+    """Bod krivky v globalnim parametru."""
+    nodes = subpath.nodes
+    count = len(nodes)
+    index = int(value)
+    t = value - index
+    if not subpath.closed and index >= count - 1:
+        return QPointF(nodes[-1].point)
+    start = nodes[index % count]
+    end = nodes[(index + 1) % count]
+    return point_on_segment(start, end, t)
+
+
 def split_subpath(subpath: SubPath, cuts: list[float]) -> list[SubPath]:
-    """Rozdeli cast krivky v zadanych globalnich parametrech."""
+    """Rozdeli cast krivky v zadanych globalnich parametrech.
+
+    Rezy se drzi jako body, ne jako cisla. Kazde rozdeleni totiz zmeni
+    cislovani segmentu, takze prepocitany parametr by dalsi rez posunul -
+    u dvou rezu na jednom segmentu i o pulku jeho delky.
+    """
     values = sorted({round(value, 6) for value in cuts})
     if not values:
         return [subpath.copy()]
 
-    work = subpath.copy()
-    if work.closed:
-        work = _open_at(work, values[0])
-        # Po rozstrihnuti smycky se ostatni rezy posunuly o prvni rez.
-        shift = values[0]
-        total = len(subpath.nodes)
-        values = [(value - shift) % total for value in values[1:]]
-        values = sorted(value for value in values if value > 1e-6)
-        if not values:
-            return [work]
+    if subpath.closed:
+        points = [point_at(subpath, value) for value in values[1:]]
+        work = _open_at(subpath.copy(), values[0])
+    else:
+        points = [point_at(subpath, value) for value in values]
+        work = subpath.copy()
 
     pieces: list[SubPath] = []
-    for value in reversed(values):
-        head, tail = _split_once(work, value)
+    for point in reversed(points):
+        found = locate_point([work], point)
+        if found is None or found[2] > 1.0:
+            continue
+        head, tail = _split_once(work, found[1])
         if tail is not None and len(tail.nodes) > 1:
             pieces.insert(0, tail)
         work = head

@@ -6,7 +6,7 @@ import math
 
 from PySide6.QtCore import QLineF, QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
-from PySide6.QtWidgets import QGraphicsItem
+from PySide6.QtWidgets import QApplication, QGraphicsItem
 
 from .nodes import (
     Node,
@@ -19,9 +19,11 @@ from .nodes import (
     nearest_on_segment,
     path_intersections,
     path_to_subpaths,
+    self_intersections,
     simplify_points,
     split_subpath,
     stroke_area,
+    subpath_length,
     subpaths_to_path,
 )
 from .shapes import (
@@ -66,6 +68,9 @@ class Tool:
 
     def cancel(self) -> None:
         pass
+
+    def clear_hover(self) -> None:
+        """Zrusi nahled, kdyz kurzor opusti platno."""
 
     def mouse_press(self, event, scene_pos: QPointF, view_pos: QPointF) -> bool:
         return False
@@ -1095,100 +1100,241 @@ class CutTool(Tool):
     def __init__(self, view):
         super().__init__(view)
         self.origin: QPointF | None = None
+        self.origin_view: QPointF | None = None
         self.cursor_point: QPointF | None = None
+        #: Co je pod kurzorem: krizeni a kus, ktery by klik odebral.
+        self.hover_shape: ShapeMixin | None = None
+        self.hover_crossings: list[QPointF] = []
+        self.hover_piece: QPainterPath | None = None
 
     def cancel(self) -> None:
         self.origin = None
+        self.origin_view = None
         self.view.viewport().update()
+
+    def clear_hover(self) -> None:
+        self.hover_shape = None
+        self.hover_crossings = []
+        self.hover_piece = None
+
+    def deactivate(self) -> None:
+        self.clear_hover()
+        super().deactivate()
 
     def mouse_press(self, event, scene_pos: QPointF, view_pos: QPointF) -> bool:
         if event.button() != Qt.MouseButton.LeftButton:
             return False
         self.origin = scene_pos
+        self.origin_view = QPointF(view_pos)
         self.cursor_point = scene_pos
         return True
 
     def mouse_move(self, event, scene_pos: QPointF, view_pos: QPointF) -> bool:
         self.cursor_point = scene_pos
+        if self.origin is None:
+            self._update_hover(scene_pos, view_pos)
+            self.view.viewport().update()
         return self.origin is not None
+
+    def _update_hover(self, scene_pos: QPointF, view_pos: QPointF) -> None:
+        """Dopredu spocita, co by klik v tomhle miste udelal."""
+        # Nejdriv tah, na kterem kurzor opravdu lezi, teprve pak to, co je navrchu.
+        shape = self._nearest_curve(scene_pos) or self.view.shape_at(view_pos)
+        if shape is None:
+            self.hover_shape = None
+            self.hover_crossings = []
+            self.hover_piece = None
+            return
+
+        if shape is not self.hover_shape:
+            self.hover_shape = shape
+            self.hover_crossings = self._crossings(shape)
+
+        plan = self._plan_cut(shape, scene_pos, self.hover_crossings)
+        if plan is None:
+            self.hover_piece = None
+            return
+        target, pieces, remove, _ = plan
+        self.hover_piece = target.sceneTransform().map(
+            subpaths_to_path([pieces[remove]]))
 
     def mouse_release(self, event, scene_pos: QPointF, view_pos: QPointF) -> bool:
         if self.origin is None:
             return False
         origin = self.origin
+        origin_view = self.origin_view
         self.origin = None
+        self.origin_view = None
 
-        if distance(origin, scene_pos) > 4.0 / self.view.scale_factor():
+        # Ruka se pri kliknuti vzdycky trochu hne, proto se tazeni pozna az
+        # podle systemoveho prahu a meri se v pixelech obrazovky, aby to
+        # nezaviselo na priblizeni.
+        moved = ((view_pos - origin_view).manhattanLength()
+                 if origin_view is not None else 0.0)
+        if moved > QApplication.startDragDistance():
             self._knife(origin, scene_pos)
             return True
 
-        shape = self.view.shape_at(view_pos) or self._nearest_curve(scene_pos)
+        # Rozhoduje misto stisku, ne pusteni. Ruka se mezi tim hne a u krizeni
+        # by se tak trefil jiny tah, nez na ktery uzivatel miril.
+        press_view = origin_view if origin_view is not None else view_pos
+        # Nejdriv tah, na kterem kurzor opravdu lezi, teprve pak to, co je navrchu.
+        shape = self._nearest_curve(origin) or self.view.shape_at(press_view)
         if shape is None:
             self.view.message.emit("Nuz potrebuje krivku nebo caru pod kurzorem.")
             return True
         keep_all = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
-        self._cut_at_click(shape, scene_pos, keep_all)
+        self._cut_at_click(shape, origin, keep_all)
         return True
 
     # -- vlastni rezani ---------------------------------------------------
-    def _nearest_curve(self, scene_pos: QPointF) -> ShapeMixin | None:
-        threshold = 10.0 / self.view.scale_factor()
-        best = None
+    def _nearest_curve(self, scene_pos: QPointF, extra: float = 0.0) -> ShapeMixin | None:
+        """Tah, jehoz osa je kurzoru nejbliz.
+
+        Zamerne se neridi tim, co je navrchu: u krizeni by se jinak rezal
+        ten vrchni tah misto toho, na kterem kurzor opravdu lezi.
+        """
+        candidates: list[tuple[ShapeMixin, float]] = []
         for shape in self.scene.shapes():
             if isinstance(shape, TextShape):
                 continue
+            threshold = max(10.0 / self.view.scale_factor(),
+                            shape.style.stroke_width / 2.0 + extra)
             found = locate_point(path_to_subpaths(shape.scene_path()), scene_pos)
             if found is not None and found[2] <= threshold:
-                if best is None or found[2] < best[1]:
-                    best = (shape, found[2])
-        return best[0] if best else None
+                candidates.append((shape, found[2]))
+
+        if not candidates:
+            return None
+
+        # Presne v krizeni lezi osy obou tahu na stejnem miste a rozhodovala by
+        # nahoda. Pri shode proto vyhrava ten tah, ktery je nahore - je to ten,
+        # ktery uzivatel na tom miste vidi.
+        closest = min(distance for _, distance in candidates)
+        tied = [shape for shape, distance in candidates if distance <= closest + 1.5]
+        return max(tied, key=lambda item: item.zValue())
 
     def _crossings(self, shape: ShapeMixin) -> list[QPointF]:
         own = shape.scene_path()
-        points: list[QPointF] = []
+        found: list[QPointF] = []
         for other in self.scene.shapes():
             if other is shape or isinstance(other, TextShape):
                 continue
-            points.extend(path_intersections(own, other.scene_path()))
+            # Tlusty tah vypada spojene, i kdyz se osy minou. Tolerance je
+            # polovina souctu tlousťek, pri ktere se tahy jeste dotykaji,
+            # a par pixelu navic na nepresnost ruky.
+            tolerance = min(18.0, max(2.0, (shape.style.stroke_width
+                                            + other.style.stroke_width) / 2.0 + 2.0))
+            found.extend(path_intersections(own, other.scene_path(), tolerance))
+        # Tah se casto krizi i sam se sebou, treba kdyz konci pres svuj zacatek.
+        found.extend(self_intersections(own))
+
+        points: list[QPointF] = []
+        for point in found:
+            if all(distance(point, kept) > 2.0 for kept in points):
+                points.append(point)
         return points
 
-    def _cut_at_click(self, shape: ShapeMixin, scene_pos: QPointF, keep_all: bool) -> None:
+    def _plan_cut(self, shape: ShapeMixin, scene_pos: QPointF,
+                  crossings: list[QPointF] | None = None):
+        """Spocita rez, ale nic nemeni.
+
+        Vraci ``(target, pieces, index_kusu_pod_kurzorem, pocet_krizeni)``,
+        nebo None, kdyz tady rez nic nerozdeli. Stejny vypocet pouziva
+        i nahled pod kurzorem, aby ukazoval presne to, co klik udela.
+        """
         target = shape if isinstance(shape, PathShape) else to_path_shape(shape)
         subpaths = path_to_subpaths(target.path())
         local_click = target.mapFromScene(scene_pos)
 
         found = locate_point(subpaths, local_click)
         if found is None:
-            self.view.message.emit("Na krivce se nenaslo misto k rezu.")
-            return
+            return None
         index, click_param, _ = found
 
+        if crossings is None:
+            crossings = self._crossings(shape)
+
         cuts: list[float] = []
-        for point in self._crossings(shape):
+        for point in crossings:
             located = locate_point([subpaths[index]], target.mapFromScene(point))
-            if located is not None and located[2] <= 1.5:
+            if located is not None and located[2] <= 2.0:
                 cuts.append(located[1])
 
+        crossing_count = len(cuts)
         if not cuts:
-            # Zadne krizeni: krivku aspon rozdelime v miste kliknuti.
             cuts = [click_param]
-            keep_all = True
 
         pieces = split_subpath(subpaths[index], cuts)
         if len(pieces) < 2:
-            self.view.message.emit("Tady rez nic nerozdeli.")
-            return
+            return None
 
-        if not keep_all:
+        chosen = self._piece_at(subpaths[index], cuts, click_param, len(pieces))
+        if chosen is None:
+            # Zalozni varianta: kus, ktery lezi kliku nejbliz.
             distances = []
             for piece in pieces:
                 located = locate_point([piece], local_click)
                 distances.append(located[2] if located else float("inf"))
+            chosen = distances.index(min(distances))
+        return target, pieces, chosen, crossing_count
 
-            pieces.pop(distances.index(min(distances)))
+    @staticmethod
+    def _piece_at(subpath: SubPath, cuts: list[float], click: float,
+                  count: int) -> int | None:
+        """Kolikaty kus krivky obsahuje misto kliknuti.
 
+        Pocita se podle polohy na krivce, ne podle vzdalenosti. U krizeni
+        jsou totiz dva sousedni kusy od kliku stejne daleko a vybral by se
+        nahodne ten druhy.
+        """
+        ordered = sorted(set(round(value, 6) for value in cuts))
+        if not ordered:
+            return None
+
+        if subpath.closed:
+            total = len(subpath.nodes)
+            if total <= 0:
+                return None
+            start = ordered[0]
+            relative = [(value - start) % total for value in ordered[1:]]
+            position = (click - start) % total
+        else:
+            relative = ordered
+            position = click
+
+        index = sum(1 for value in relative if value <= position)
+        return index if 0 <= index < count else None
+
+    def _cut_at_click(self, shape: ShapeMixin, scene_pos: QPointF, keep_all: bool) -> None:
+        plan = self._plan_cut(shape, scene_pos)
+        if plan is None:
+            self.view.message.emit(
+                "Tady rez nic nerozdeli. Zkus kliknout jinam na krivku, mezi "
+                "dve mista, kde ji neco protina.")
+            return
+        target, pieces, remove, crossing_count = plan
+
+        if crossing_count == 0:
+            self.view.message.emit(
+                "Krivka se s nicim nekrizi, takze jsem ji jen rozdelil v miste "
+                "kliknuti. Na orezani je potreba, aby ji neco protinalo.")
+        elif keep_all:
+            self.view.message.emit(f"Rozdeleno na {len(pieces)} casti, nic se nemazalo.")
+        else:
+            pieces.pop(remove)
+            self.view.message.emit(
+                f"Odebrano. Z krivky zbyly {len(pieces)} casti "
+                f"(nalezeno {crossing_count} krizeni).")
+
+        subpaths = path_to_subpaths(target.path())
+        local_click = target.mapFromScene(scene_pos)
+        located = locate_point(subpaths, local_click)
+        index = located[0] if located else 0
         rest = [subpaths[i] for i in range(len(subpaths)) if i != index]
         self._replace(shape, target, pieces + rest)
+        self.hover_shape = None
+        self.hover_piece = None
 
     def _knife(self, start: QPointF, end: QPointF) -> None:
         blade = QPainterPath(start)
@@ -1209,7 +1355,7 @@ class CutTool(Tool):
                 cuts = []
                 for point in crossings:
                     located = locate_point([subpath], target.mapFromScene(point))
-                    if located is not None and located[2] <= 1.5:
+                    if located is not None and located[2] <= 2.0:
                         cuts.append(located[1])
                 result.extend(split_subpath(subpath, cuts) if cuts else [subpath])
             if len(result) > len(subpaths):
@@ -1229,10 +1375,19 @@ class CutTool(Tool):
             # delala nesmyslne plochy.
             style.fill = None
 
+        # Kousek kratsi nez tloustka tahu neni cara, ale tecka. Takovy zbytek
+        # po rezu v krizeni akorat prekazi.
+        minimum = max(2.0, style.stroke_width * 0.9)
+        usable = [piece for piece in pieces
+                  if len(piece.nodes) >= 2
+                  and (piece.closed or subpath_length(piece) >= minimum)]
+        if not usable:
+            usable = [max(pieces, key=subpath_length)] if pieces else []
+
         z = original.zValue()
         self.scene.removeItem(original)
         created = []
-        for order, piece in enumerate(pieces):
+        for order, piece in enumerate(usable):
             if len(piece.nodes) < 2:
                 continue
             path = subpaths_to_path([piece])
@@ -1251,14 +1406,35 @@ class CutTool(Tool):
             self.view.snapshot("Rezani krivky")
 
     def draw_overlay(self, painter: QPainter, scale: float) -> None:
-        if self.origin is None or self.cursor_point is None:
+        if self.origin is not None and self.cursor_point is not None:
+            pen = QPen(QColor("#e74c3c"))
+            pen.setCosmetic(True)
+            pen.setStyle(Qt.PenStyle.DashLine)
+            painter.setPen(pen)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawLine(self.origin, self.cursor_point)
             return
-        pen = QPen(QColor("#e74c3c"))
-        pen.setCosmetic(True)
-        pen.setStyle(Qt.PenStyle.DashLine)
-        painter.setPen(pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawLine(self.origin, self.cursor_point)
+
+        # Kus, ktery klik odebere, se predem obtahne cervene.
+        if self.hover_piece is not None:
+            pen = QPen(QColor(231, 76, 60, 190))
+            pen.setWidthF(max(6.0, 10.0 / scale))
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+            painter.setPen(pen)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawPath(self.hover_piece)
+
+        # Nalezena krizeni, at je videt, co nuz vidi.
+        if self.hover_crossings:
+            pen = QPen(QColor("#e67e22"))
+            pen.setCosmetic(True)
+            pen.setWidth(2)
+            painter.setPen(pen)
+            painter.setBrush(QColor(255, 255, 255, 220))
+            radius = 5.0 / scale
+            for point in self.hover_crossings:
+                painter.drawEllipse(point, radius, radius)
 
 
 class EraserTool(Tool):

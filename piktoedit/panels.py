@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPushButton,
+    QSizePolicy,
     QSlider,
     QToolButton,
     QVBoxLayout,
@@ -613,9 +614,12 @@ class CaptionPanel(QWidget):
         self.remove_button = QPushButton("Odebrat popisek", self)
         layout.addWidget(self.apply_button)
         layout.addWidget(self.remove_button)
-        layout.addWidget(QLabel(
-            "Popisek zustava vodorovne na stredu. Dal se s nim da pracovat\n"
-            "jako s beznym textem v seznamu objektu.", self))
+        hint = QLabel("Popisek zustava vodorovne na stredu. Dal se s nim da "
+                      "pracovat jako s beznym textem v seznamu objektu.", self)
+        hint.setWordWrap(True)
+        # Dlouhy popisek by jinak nastavil panelu velkou minimalni sirku.
+        hint.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        layout.addWidget(hint)
         layout.addStretch(1)
 
         self.text_edit.editingFinished.connect(self._emit_apply)
@@ -740,6 +744,8 @@ class TemplatePanel(QWidget):
 
         self.title_label = QLabel(self)
         self.title_label.setWordWrap(True)
+        self.title_label.setSizePolicy(QSizePolicy.Policy.Ignored,
+                                       QSizePolicy.Policy.Preferred)
         layout.addWidget(self.title_label)
 
         self.list = DragListWidget(self)
