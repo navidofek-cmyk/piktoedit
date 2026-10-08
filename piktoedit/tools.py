@@ -1267,6 +1267,11 @@ class CutTool(Tool):
 
         pieces = split_subpath(subpaths[index], cuts)
         if len(pieces) < 2:
+            if crossing_count:
+                # Krivku neco protina, ale jen na koncich. Typicky je to kus,
+                # ktery sam vznikl predchozim rezem - cely je tim kouskem mezi
+                # reznymi hranami, takze se odebere jako celek.
+                return target, [subpaths[index]], 0, crossing_count
             return None
 
         chosen = self._piece_at(subpaths[index], cuts, click_param, len(pieces))
@@ -1315,12 +1320,24 @@ class CutTool(Tool):
             return
         target, pieces, remove, crossing_count = plan
 
-        if crossing_count == 0:
+        whole = len(pieces) == 1
+
+        if keep_all:
+            if whole:
+                self.view.message.emit(
+                    "Shift jen deli, ale tenhle kus neni kde rozdelit - "
+                    "protina ho neco jen na koncich.")
+                return
+            self.view.message.emit(f"Rozdeleno na {len(pieces)} casti, nic se nemazalo.")
+        elif crossing_count == 0:
             self.view.message.emit(
                 "Krivka se s nicim nekrizi, takze jsem ji jen rozdelil v miste "
                 "kliknuti. Na orezani je potreba, aby ji neco protinalo.")
-        elif keep_all:
-            self.view.message.emit(f"Rozdeleno na {len(pieces)} casti, nic se nemazalo.")
+        elif whole:
+            pieces.pop(remove)
+            self.view.message.emit(
+                "Odebran cely kus - protinalo ho neco jen na koncich, takze "
+                "cely lezel mezi reznymi hranami.")
         else:
             pieces.pop(remove)
             self.view.message.emit(
