@@ -24,6 +24,17 @@ python main.py piktogramy\mama.svg
 
 Potreba je Python 3.10+ a PySide6 (`pip install -r requirements.txt`).
 
+## Zkousky
+
+```powershell
+./spustit_testy.ps1
+```
+
+Zkousky bezi bez zobrazeni okna a ovladaji editor skutecnymi udalostmi
+mysi, takze overuji i vyber nastroje a prichytavani, ne jen vypocty
+uvnitr. Deset sad probehne kolem sedmnacti sekund, jedna z nich generuje
+nahodne kresby. Podrobnosti v `tests/README.md`.
+
 ### Sestaveni .exe
 
 ```powershell
@@ -246,6 +257,7 @@ vector_graphics_editor/
   build_exe.ps1         sestaveni .exe
   PiktoEdit.spec        nastaveni PyInstalleru
   dist/PiktoEdit.exe    hotovy program
+  tests/                zkousky, spousti je spustit_testy.ps1
   piktoedit/
     app.py              vytvoreni QApplication
     mainwindow.py       okno, menu, panely, prace se soubory
