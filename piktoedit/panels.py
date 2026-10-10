@@ -669,14 +669,44 @@ class CaptionPanel(QWidget):
             self._loading = False
 
 
+class CommandEdit(QLineEdit):
+    """Radek na zadani prikazu. Sipky nahoru a dolu listuji zadanym."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.past: list[str] = []
+        self.position = 0
+
+    def remember(self, text: str) -> None:
+        if text and (not self.past or self.past[-1] != text):
+            self.past.append(text)
+        self.position = len(self.past)
+
+    def keyPressEvent(self, event) -> None:
+        key = event.key()
+        if key == Qt.Key.Key_Up and self.past:
+            self.position = max(0, self.position - 1)
+            self.setText(self.past[self.position])
+            return
+        if key == Qt.Key.Key_Down and self.past:
+            self.position = min(len(self.past), self.position + 1)
+            self.setText("" if self.position >= len(self.past)
+                         else self.past[self.position])
+            return
+        super().keyPressEvent(event)
+
+
 class HistoryPanel(QWidget):
-    """Viditelna historie operaci.
+    """Viditelna historie operaci a radek na zadani prikazu.
 
     Kazdy radek je zapsany jako prikaz, takze z historie je videt nejen
-    ze se neco stalo, ale i s cim a jak.
+    ze se neco stalo, ale i s cim a jak - a tentyz zapis jde do prikazoveho
+    radku zpatky napsat a tim operaci zopakovat.
     """
 
     save_requested = Signal()
+    #: Uzivatel zadal prikaz k provedeni.
+    command_entered = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -696,6 +726,23 @@ class HistoryPanel(QWidget):
         self.text.setFont(QFont("Consolas", 9))
         layout.addWidget(self.text, 1)
 
+        prompt = QLabel("Prikaz (Enter provede, sipky listuji):", self)
+        prompt.setWordWrap(True)
+        prompt.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        layout.addWidget(prompt)
+
+        self.command_edit = CommandEdit(self)
+        self.command_edit.setPlaceholderText("obdelnik 200 200 400 300 --vypln #ffcc00")
+        self.command_edit.setFont(QFont("Consolas", 9))
+        layout.addWidget(self.command_edit)
+        self.command_edit.returnPressed.connect(self._send_command)
+
+        self.result_label = QLabel("Napis 'prikazy' a vypisu, co vsechno umim.", self)
+        self.result_label.setWordWrap(True)
+        self.result_label.setSizePolicy(QSizePolicy.Policy.Ignored,
+                                        QSizePolicy.Policy.Preferred)
+        layout.addWidget(self.result_label)
+
         self.save_button = QPushButton("Ulozit historii do souboru…", self)
         layout.addWidget(self.save_button)
         self.save_button.clicked.connect(self.save_requested.emit)
@@ -705,6 +752,24 @@ class HistoryPanel(QWidget):
         hint.setWordWrap(True)
         hint.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         layout.addWidget(hint)
+
+    def _send_command(self) -> None:
+        line = self.command_edit.text().strip()
+        if not line:
+            return
+        self.command_edit.remember(line)
+        self.command_edit.clear()
+        self.command_entered.emit(line)
+
+    def show_result(self, text: str, ok: bool = True) -> None:
+        self.result_label.setText(text)
+        self.result_label.setStyleSheet("" if ok else "color: #c0392b;")
+
+    def show_listing(self, text: str) -> None:
+        """Dlouhy vypis (napriklad prehled prikazu) misto historie."""
+        self.text.setPlainText(text)
+        self.text.verticalScrollBar().setValue(0)
+        self.count_label.setText("Vypis prikazu - dalsi operace vrati historii.")
 
     def refresh(self, journal) -> None:
         lines = journal.lines()

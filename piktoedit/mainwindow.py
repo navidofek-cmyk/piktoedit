@@ -38,7 +38,8 @@ from PySide6.QtWidgets import (
 
 from . import svgio
 from .canvas import CanvasScene, CanvasView
-from .journal import Journal, color, number, point, quoted, style_args
+from .commands import CommandError, run_line, template_name
+from .journal import Journal, color, number, point, quoted, shape_ids, style_args
 from .nodes import join_subpaths, path_to_subpaths, subpaths_to_path
 from .panels import (
     CaptionPanel,
@@ -430,6 +431,7 @@ class MainWindow(QMainWindow):
 
         self.history_panel = HistoryPanel(self)
         self.history_panel.save_requested.connect(self.save_journal_as)
+        self.history_panel.command_entered.connect(self.run_command)
 
         tabs = QTabWidget(self)
         tabs.addTab(self._scrollable(self.caption_panel), "Popisek")
@@ -475,6 +477,38 @@ class MainWindow(QMainWindow):
             self.journal.record(detail or label.lower())
             self.history_panel.refresh(self.journal)
         self.refresh_panels()
+
+    def reset_journal(self, reason: str = "") -> None:
+        """Nova nebo otevrena kresba zacina s prazdnou historii."""
+        self.journal.clear(f"# {reason}" if reason else "")
+        self.history_panel.refresh(self.journal)
+
+    # ------------------------------------------------------------------
+    # Prikazy
+    # ------------------------------------------------------------------
+    def run_command(self, line: str) -> bool:
+        """Provede jeden prikaz z prikazoveho radku v panelu historie."""
+        try:
+            message = run_line(self, line)
+        except CommandError as error:
+            self.history_panel.show_result(f"{line}  ->  {error}", False)
+            self.statusBar().showMessage(f"Prikaz: {error}", 8000)
+            return False
+        except Exception as error:  # noqa: BLE001
+            self.history_panel.show_result(
+                f"{line}  ->  {type(error).__name__}: {error}", False)
+            return False
+
+        lines = (message or "").splitlines()
+        if len(lines) > 1:
+            # Delsi vypis (napriklad prehled prikazu) se vejde jen do okna.
+            self.history_panel.show_result(lines[0])
+            self.history_panel.show_listing(message)
+        else:
+            self.history_panel.show_result(message or "Hotovo.")
+            self.statusBar().showMessage(message or "Hotovo.", 6000)
+        self.refresh_panels()
+        return True
 
     def refresh_panels(self) -> None:
         self.properties.refresh()
@@ -545,6 +579,9 @@ class MainWindow(QMainWindow):
                 5000)
             return
 
+        # Poradi tvaru se musi zapsat jeste pred zmenou - po slouceni uz
+        # puvodni tvary v kresbe nejsou.
+        ids = shape_ids(shapes, self.scene.shapes())
         base = shapes[0]
         result = base.scene_path()
         for other in shapes[1:]:
@@ -577,7 +614,7 @@ class MainWindow(QMainWindow):
                  "intersect": "prunik", "exclude": "vyloucit"}
         self.snapshot({"unite": "Sjednoceni", "subtract": "Odecteni",
                        "intersect": "Prunik"}.get(operation, "Vylouceni"),
-                      f"{names.get(operation, operation)} --objektu {len(shapes)} "
+                      f"{names.get(operation, operation)} {ids} "
                       f"--vysledek {quoted(replacement.name)}")
 
     def join_selected(self) -> None:
@@ -588,6 +625,7 @@ class MainWindow(QMainWindow):
                 "Napojeni potrebuje aspon dve krivky nebo cary.", 5000)
             return
 
+        ids = shape_ids(shapes, self.scene.shapes())
         subpaths: list = []
         for shape in shapes:
             subpaths.extend(path_to_subpaths(shape.scene_path()))
@@ -612,7 +650,7 @@ class MainWindow(QMainWindow):
                 f"Napojeno, ale zbyly {parts} nespojene casti. Konce musi byt bliz nez "
                 f"{self.view.join_tolerance:.0f} px.", 6000)
         self.snapshot("Napojeni krivek",
-                      f"napojit --objektu {len(shapes)} --casti {parts} "
+                      f"napojit {ids} --casti {parts} "
                       f"--uzavrene {'ano' if closed else 'ne'}")
 
     def close_selected(self) -> None:
@@ -621,6 +659,7 @@ class MainWindow(QMainWindow):
         if not shapes:
             self.statusBar().showMessage("Uzavrit jde jen krivku.", 4000)
             return
+        ids = shape_ids(shapes, self.scene.shapes())
         for shape in shapes:
             shape.set_closed(True)
             if shape.style.fill is None:
@@ -628,8 +667,7 @@ class MainWindow(QMainWindow):
                 style.fill = QColor(self.view.default_style.fill or QColor("#ffffff"))
                 shape.set_style(style)
         self.snapshot("Uzavreni krivky",
-                      f"uzavrit --objektu {len(shapes)} "
-                      f"--vypln {color(shapes[0].style.fill)}")
+                      f"uzavrit {ids} --vypln {color(shapes[0].style.fill)}")
 
     def convert_to_path(self, shape: ShapeMixin | None = None) -> None:
         targets = [shape] if isinstance(shape, ShapeMixin) else self.scene.selected_shapes()
@@ -639,6 +677,7 @@ class MainWindow(QMainWindow):
                 "na nej klikni.", 6000)
             return None
 
+        ids = shape_ids(targets, self.scene.shapes())
         converted = []
         changed = 0
         for item in targets:
@@ -664,7 +703,7 @@ class MainWindow(QMainWindow):
                     for item in converted if isinstance(item, PathShape)
                     for part in path_to_subpaths(item.path()))
         self.snapshot("Prevod na krivku",
-                      f"na-krivku --objektu {changed} --uzlu {nodes}")
+                      f"na-krivku {ids} --uzlu {nodes}")
         self.statusBar().showMessage(
             f"Prevedeno na krivku: {changed} objektu, celkem {nodes} uzlu. "
             f"Uprav je nastrojem Uzly (N).", 6000)
@@ -677,20 +716,21 @@ class MainWindow(QMainWindow):
         if replacement is not None and isinstance(tool, NodeTool):
             tool.load(replacement)
 
-    def _quick_color(self, field: str, color: QColor) -> None:
+    def _quick_color(self, field: str, value: QColor) -> None:
         shapes = self.scene.selected_shapes()
         if not shapes:
-            setattr(self.view.default_style, field, color)
+            setattr(self.view.default_style, field, value)
             self.properties.refresh()
             return
         for shape in shapes:
             style = shape.style.copy()
-            setattr(style, field, color)
+            setattr(style, field, value)
             shape.set_style(style)
-        setattr(self.view.default_style, field, color)
+        setattr(self.view.default_style, field, value)
+        option = "vypln" if field == "fill" else "obrys"
         self.snapshot("Zmena barvy",
-                      f"barva --{field} {color(color_value)} "
-                      f"--objektu {len(shapes)}")
+                      f"barva --{option} {color(value)} "
+                      f"{shape_ids(shapes, self.scene.shapes())}")
 
     # ------------------------------------------------------------------
     # Prace se soubory
@@ -718,6 +758,7 @@ class MainWindow(QMainWindow):
         self.path = None
         self.undo.reset()
         self.undo.stack.setClean()
+        self.reset_journal("nova kresba")
         self._update_title()
         self.view.zoom_fit()
 
@@ -740,6 +781,7 @@ class MainWindow(QMainWindow):
         self.path = path
         self.undo.reset()
         self.undo.stack.setClean()
+        self.reset_journal(f"otevreno {quoted(path.name)}")
         self._update_title()
         self.view.zoom_fit()
 
@@ -872,10 +914,9 @@ class MainWindow(QMainWindow):
             shape.setSelected(True)
         self.snapshot(
             "Vlozeni sablony" if whole else "Vlozeni dilu",
-            f"sablona {quoted(Path(path).name)}"
+            f"sablona {quoted(template_name(path))}"
             + ("" if whole else f" --dil {index}")
-            + (f" --na {point(scene_pos.x(), scene_pos.y())}" if scene_pos else "")
-            + f" --tvaru {len(shapes)}")
+            + (f" --na {point(scene_pos.x(), scene_pos.y())}" if scene_pos else ""))
 
     def new_from_template(self, path: str) -> None:
         if not self._confirm_discard():
@@ -905,7 +946,7 @@ class MainWindow(QMainWindow):
         self.scene.reference = image
         self.document.reference_path = str(path)
         if record:
-            self.snapshot("Predloha", f"predloha {quoted(Path(path).name)}")
+            self.snapshot("Predloha", f"predloha {quoted(Path(path).as_posix())}")
 
     def set_reference_opacity(self, value: float) -> None:
         self.document.reference_opacity = value
@@ -949,12 +990,13 @@ class MainWindow(QMainWindow):
             shape.setZValue(base + index)
             self.scene.addItem(shape)
             shape.setSelected(True)
-        self.snapshot("Vlozeni", f"vlozit --tvaru {len(shapes)}")
+        self.snapshot("Vlozeni ze schranky", f"schranka --tvaru {len(shapes)}")
 
     def duplicate(self) -> None:
         shapes = self.scene.selected_shapes()
         if not shapes:
             return
+        ids = shape_ids(shapes, self.scene.shapes())
         self.scene.clearSelection()
         base = self.scene.next_z()
         for index, shape in enumerate(shapes):
@@ -963,17 +1005,17 @@ class MainWindow(QMainWindow):
             copy.setZValue(base + index)
             self.scene.addItem(copy)
             copy.setSelected(True)
-        self.snapshot("Duplikace", f"duplikovat --tvaru {len(shapes)}")
+        self.snapshot("Duplikace", f"duplikovat {ids}")
 
     def delete_selection(self) -> None:
         shapes = self.scene.selected_shapes()
         if not shapes:
             return
+        ids = shape_ids(shapes, self.scene.shapes())
+        names = " ".join(quoted(shape.name) for shape in shapes[:4])
         for shape in shapes:
             self.scene.removeItem(shape)
-        self.snapshot("Smazani",
-                      "smazat " + " ".join(quoted(s.name) for s in shapes[:4])
-                      + (f" a dalsich {len(shapes) - 4}" if len(shapes) > 4 else ""))
+        self.snapshot("Smazani", f"smazat {ids}  # {names}")
 
     def select_all(self) -> None:
         for shape in self.scene.shapes():
@@ -981,9 +1023,12 @@ class MainWindow(QMainWindow):
         self.refresh_panels()
 
     def reorder(self, direction: int) -> None:
+        shapes = self.scene.selected_shapes()
+        ids = shape_ids(shapes, self.scene.shapes())
         self.layers._reorder(direction)
         self.snapshot("Zmena poradi",
-                      "poradi " + ("--dopredu" if direction > 0 else "--dozadu"))
+                      "poradi " + ("--nahoru" if direction > 0 else "--dolu")
+                      + (f" {ids}" if ids else ""))
 
     def center_on_page(self, horizontal: bool) -> None:
         shapes = self.scene.selected_shapes()
@@ -1004,7 +1049,7 @@ class MainWindow(QMainWindow):
             shape.setPos(shape.pos() + delta)
         self.snapshot("Zarovnani",
                       "zarovnat " + ("--vodorovne" if horizontal else "--svisle")
-                      + f" --objektu {len(shapes)}")
+                      + f" {shape_ids(shapes, self.scene.shapes())}")
 
     def show_tab(self, panel: QWidget) -> None:
         """Prepne na zalozku s danym panelem, i kdyz je v rolovaci plose."""
@@ -1093,8 +1138,8 @@ class MainWindow(QMainWindow):
             self.reference.fit_into(self.document.width, self.document.height)
         self.scene.update_page()
         self.snapshot("Nastaveni kresby",
-                      f"kresba --rozmer {number(self.document.width)}"
-                      f"x{number(self.document.height)} "
+                      f"strana {number(self.document.width)} "
+                      f"{number(self.document.height)} "
                       f"--mrizka {number(self.document.grid_size)} "
                       f"--pozadi {color(self.document.background)}")
 

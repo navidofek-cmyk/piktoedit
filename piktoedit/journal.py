@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from .pathdata import path_to_data
+
 
 def number(value: float) -> str:
     """Cislo do zapisu: bez zbytecnych desetinnych mist."""
@@ -60,19 +62,97 @@ def kind_name(shape) -> str:
 
 
 def shape_line(shape) -> str:
-    """Cely radek pro nove vznikly tvar."""
+    """Cely radek pro nove vznikly tvar.
+
+    Radek je zamerne takovy, aby tvar dokazal znovu vyrobit - rozmery jsou
+    v souradnicich kresby a pripadne otoceni je zvlast v ``--uhel``, takze
+    zapis neni jen popis, ale i prikaz.
+    """
     return f"{kind_name(shape)} {shape_args(shape)}"
 
 
 def shape_args(shape) -> str:
     """Popis tvaru tak, jak by sel zadat."""
-    rect = shape.mapToScene(shape.local_rect()).boundingRect()
-    parts = [f"{number(rect.x())} {number(rect.y())}",
-             f"{number(rect.width())} {number(rect.height())}"]
+    kind = getattr(shape, "kind", "")
+    if kind == "line":
+        parts = [_line_args(shape)]
+    elif kind == "path":
+        parts = [_path_args(shape)]
+    elif kind == "text":
+        parts = [_text_args(shape)]
+    else:
+        parts = [_box_args(shape)]
+        if getattr(shape, "radius", 0.0):
+            parts.append(f"--radius {number(shape.radius)}")
     if shape.rotation():
         parts.append(f"--uhel {number(shape.rotation())}")
     parts.append(style_args(shape.style))
+    if shape.name and shape.name != getattr(shape, "default_name", ""):
+        parts.append(f"--nazev {quoted(shape.name)}")
+    return " ".join(part for part in parts if part)
+
+
+def _box_args(shape) -> str:
+    """Obdelnik tvaru v souradnicich kresby, bez otoceni."""
+    rect = shape.local_rect().translated(shape.pos())
+    return (f"{number(rect.x())} {number(rect.y())} "
+            f"{number(rect.width())} {number(rect.height())}")
+
+
+def _line_args(shape) -> str:
+    line = shape.line().translated(shape.pos())
+    return f"{point(line.x1(), line.y1())} {point(line.x2(), line.y2())}"
+
+
+def _path_args(shape) -> str:
+    # Zapis krivky je dlouhy, ale je to presne ona - jinak by se z historie
+    # nedala zopakovat.
+    closed = bool(getattr(shape, "closed", False))
+    data = path_to_data(shape.path().translated(shape.pos()), closed)
+    parts = [f"--d {quoted(data)}"]
+    if closed:
+        parts.append("--uzavrena")
     return " ".join(parts)
+
+
+def _text_args(shape) -> str:
+    font = shape.font()
+    parts = [quoted(shape.text()),
+             point(shape.pos().x(), shape.pos().y()),
+             f"--velikost {number(font.pointSizeF())}",
+             f"--pismo {quoted(font.family())}"]
+    if not font.bold():
+        parts.append("--obycejne")
+    return " ".join(parts)
+
+
+def shape_ids(shapes, all_shapes) -> str:
+    """Zapis ``--tvary 2,3``: poradi tvaru v kresbe odspodu, od jednicky.
+
+    Diky nemu je radek samonosny - pri prehravani historie neni potreba
+    hadat, co bylo v te chvili vybrane.
+    """
+    order = {id(shape): index + 1 for index, shape in enumerate(all_shapes)}
+    numbers = sorted(order[id(shape)] for shape in shapes if id(shape) in order)
+    return f"--tvary {','.join(str(value) for value in numbers)}" if numbers else ""
+
+
+def box_args(shape) -> str:
+    """Kde tvar lezi a jak je velky - pro radky o posunu a zmene velikosti."""
+    parts = [f"--na {_box_corner(shape)}", f"--rozmer {_box_size(shape)}"]
+    if shape.rotation():
+        parts.append(f"--uhel {number(shape.rotation())}")
+    return " ".join(parts)
+
+
+def _box_corner(shape) -> str:
+    rect = shape.local_rect().translated(shape.pos())
+    return point(rect.x(), rect.y())
+
+
+def _box_size(shape) -> str:
+    rect = shape.local_rect()
+    return f"{number(rect.width())}x{number(rect.height())}"
 
 
 @dataclass

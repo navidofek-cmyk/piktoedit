@@ -9,7 +9,7 @@ byla prave v teto vrstve a na primem volani funkci by nebyla videt.
 ## Spusteni
 
 ```powershell
-./spustit_testy.ps1              # vsechny sady, kolem 17 s
+./spustit_testy.ps1              # vsechny sady, kolem 22 s
 ./spustit_testy.ps1 --rychle     # bez nahodne zkousky
 ./spustit_testy.ps1 nuz          # jen sady s "nuz" v nazvu
 ```
@@ -32,6 +32,8 @@ dalsiho skriptu.
 | `spolecne.py` | spolecny zaklad: okno, udalosti mysi, nastroje, kontroly |
 | `zaklad.py` | SVG tam a zpet, parser cest, sablony a jejich dily, popisek, vypln, zive upravy v panelu |
 | `prevod.py` | prevod tvaru na krivku a navazna uprava uzlu |
+| `historie.py` | zapis operaci do viditelne historie, ulozeni vedle kresby, panel |
+| `prikazy.py` | rozbor prikazu, kresleni prikazem, chybova hlaseni a prehrani cele historie kresby |
 | `mys.py` | kresleni tuzkou a rez pres udalosti mysi vcetne cuknuti ruky |
 | `guma.py` | guma na care, vyplni, tahu, pri priblizeni, na otocenem tvaru, text, zpet |
 | `nuz.py` | zakladni rezani: kusy, kolecko, obdelnik, Shift, tazeni, zoom, bezier |

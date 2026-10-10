@@ -183,6 +183,44 @@ ale i navod, jak kresbu zopakovat.
 
 Pri ulozeni kresby se historie ulozi i vedle ni jako
 `nazev.svg.historie.txt`. Tlacitkem v panelu jde ulozit kamkoliv jinam.
+Nova nebo otevrena kresba zacina s prazdnou historii.
+
+## Prikazy
+
+Radky historie nejsou jen popis - jde je zpatky napsat a tim operaci
+zopakovat. Pod vypisem historie je proto **prikazovy radek**: Enter prikaz
+provede, sipky nahoru a dolu listuji tim, co uz bylo zadano. `prikazy`
+vypise prehled.
+
+```text
+strana 1024 1024 --mrizka 16
+obdelnik 256 256 448 336 --vypln #ffffff --obrys #000000 --tloustka 8
+elipsa 340 360 120 90 --vypln #000000
+cara 300,700 720,700 --tloustka 10
+krivka --d "M 150 500 L 900 500" --tloustka 10
+krivka 200,800 400,900 600,800 --uzavrena --vypln #ffcc00
+text "AHOJ" 120,420 --velikost 64
+popisek "MAMA" --velikost 96 --odsazeni 60
+nuz --v 520,500
+guma --tah 800,450 800,550 --prumer 60
+vypln --oblast 250,200 --barva #ff8800
+vybrat --tvary 2,3
+posun --tvary 2 --na 300,300 --rozmer 100x400
+barva --vypln #00ff00 --tvary 1,2
+sablona "zvirata/kocka.svg" --dil 3 --na 512,512
+prehrat "piktogramy/kocka.svg.historie.txt"
+```
+
+Tvary se v prikazech cisluji odspodu od jednicky (`--tvary 2,3`), tak jak
+je vypisuje panel Objekty. Diky tomu je kazdy radek samonosny: rika i to,
+na cem se operace stala, a pri prehravani se nemusi hadat, co bylo vybrane.
+
+Cela historie kresby se da prehrat prikazem `prehrat`. Zkouska
+`tests/prikazy.py` presne to dela: nakresli kresbu mysi, pak ji postavi
+znovu jen z jeji historie a oba vysledky porovna.
+
+Prikazy jsou zaklad pro dalsi kroky - prikazovou radku mimo okno a pozdeji
+generovani piktogramu, ktere bude vydavat tytez radky.
 
 ## Presne kresleni
 
@@ -287,6 +325,7 @@ vector_graphics_editor/
     regionfill.py       hledani uzavrene plochy pro kyblik
     preview.py          nahledy sablon
     journal.py          viditelna historie operaci
+    commands.py         prikazova vrstva: zapis, rozbor a provedeni prikazu
     paths.py            cesty ke slozkam, i uvnitr .exe
     shapes.py           objekty na platne a jejich prevod na SVG
     svgio.py            cteni a zapis SVG, transformace, viewBox

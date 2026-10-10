@@ -26,7 +26,7 @@ from .nodes import (
     subpath_length,
     subpaths_to_path,
 )
-from .journal import number, quoted, shape_line, style_args
+from .journal import box_args, number, quoted, shape_ids, shape_line, style_args
 # 'point' se v nastrojich bezne pouziva jako nazev promenne v cyklech.
 from .journal import point as point_text
 from .shapes import (
@@ -168,21 +168,32 @@ class SelectTool(Tool):
                 self.view.snapshot(
                     "Zmena textu", f"text {quoted(item.toPlainText())}")
 
-    def _describe(self, operation: str) -> str:
+    def _describe(self, operation: str, delta: QPointF | None = None) -> str:
         """Radek do historie: co se posunulo nebo zmenilo a kam."""
         shapes = self.scene.selected_shapes()
         if not shapes:
             return operation
+        ids = shape_ids(shapes, self.scene.shapes())
         if len(shapes) == 1:
-            shape = shapes[0]
-            box = shape.mapToScene(shape.local_rect()).boundingRect()
-            detail = (f"{operation} {quoted(shape.name)} --na "
-                      f"{point_text(box.x(), box.y())} --rozmer "
-                      f"{number(box.width())}x{number(box.height())}")
-            if shape.rotation():
-                detail += f" --uhel {number(shape.rotation())}"
-            return detail
-        return f"{operation} --objektu {len(shapes)}"
+            return f"{operation} {ids} {box_args(shapes[0])}"
+        # Vic tvaru naraz se posouva o stejny kus, takze staci zapsat posun.
+        if delta is None:
+            delta = self._total_delta(shapes)
+        if delta is not None:
+            return f"{operation} {ids} --o {point_text(delta.x(), delta.y())}"
+        return f"{operation} {ids}"
+
+    def _total_delta(self, shapes: list[ShapeMixin]) -> QPointF | None:
+        """O kolik se vyber posunul od stisku mysi."""
+        deltas = [shape.pos() - self.start_positions[shape]
+                  for shape in shapes if shape in self.start_positions]
+        if not deltas or len(deltas) != len(shapes):
+            return None
+        first = deltas[0]
+        for delta in deltas[1:]:
+            if (delta - first).manhattanLength() > 0.01:
+                return None
+        return first
 
     # -- mys --------------------------------------------------------------
     def mouse_press(self, event, scene_pos: QPointF, view_pos: QPointF) -> bool:
@@ -332,7 +343,6 @@ class SelectTool(Tool):
         self.view.rubber_band = None
         self.view.snap_marker = None
         self.handle = None
-        self.start_positions = {}
 
         if self.moved:
             if mode == "move":
@@ -341,6 +351,8 @@ class SelectTool(Tool):
                 self.view.snapshot("Zmena velikosti", self._describe("velikost"))
             elif mode == "rotate":
                 self.view.snapshot("Otoceni", self._describe("otoceni"))
+        # Vychozi polohy drzi az do zapisu radku - pocita se z nich posun.
+        self.start_positions = {}
         self.moved = False
         return True
 
@@ -378,7 +390,7 @@ class SelectTool(Tool):
                 return False
             for shape in shapes:
                 shape.setPos(shape.pos() + deltas[key])
-            self.view.snapshot("Posun", self._describe("posun"))
+            self.view.snapshot("Posun", self._describe("posun", deltas[key]))
             return True
         return False
 
@@ -1223,6 +1235,19 @@ class CutTool(Tool):
         self._cut_at_click(shape, origin, keep_all)
         return True
 
+    # -- rez bez mysi -----------------------------------------------------
+    def cut_at(self, scene_pos: QPointF, keep_all: bool = False) -> bool:
+        """Rez v danem miste - tudy chodi prikaz ``nuz --v x,y``."""
+        shape = self._nearest_curve(scene_pos)
+        if shape is None:
+            return False
+        self._cut_at_click(shape, scene_pos, keep_all)
+        return True
+
+    def cut_along(self, start: QPointF, end: QPointF) -> bool:
+        """Rez carou pres celou kresbu - prikaz ``nuz --tah x,y x,y``."""
+        return self._knife(start, end)
+
     # -- vlastni rezani ---------------------------------------------------
     def _nearest_curve(self, scene_pos: QPointF, extra: float = 0.0) -> ShapeMixin | None:
         """Tah, jehoz osa je kurzoru nejbliz.
@@ -1397,7 +1422,7 @@ class CutTool(Tool):
         self.hover_shape = None
         self.hover_piece = None
 
-    def _knife(self, start: QPointF, end: QPointF) -> None:
+    def _knife(self, start: QPointF, end: QPointF) -> bool:
         blade = QPainterPath(start)
         blade.lineTo(end)
         touched = 0
@@ -1427,9 +1452,10 @@ class CutTool(Tool):
             self.view.snapshot(
                 "Rez nozem",
                 f"nuz --tah {point_text(start.x(), start.y())} "
-                f"{point_text(end.x(), end.y())} --tvaru {touched}")
-        else:
-            self.view.message.emit("Cara nozem nic neprotala.")
+                f"{point_text(end.x(), end.y())}")
+            return True
+        self.view.message.emit("Cara nozem nic neprotala.")
+        return False
 
     def _replace(self, original: ShapeMixin, target: PathShape, pieces: list[SubPath],
                  record: bool = True) -> None:
@@ -1537,21 +1563,34 @@ class EraserTool(Tool):
             return False
         points = list(self.points)
         self.points = []
+        self.erase_along(points, self.view.eraser_size, self.whole)
+        return True
+
+    def erase_along(self, points: list[QPointF], size: float | None = None,
+                    whole: bool = False) -> bool:
+        """Vygumuje plochu podel tahu. Tudy chodi i prikaz ``guma``."""
+        if not points:
+            return False
+        points = list(points)
+        diameter = self.view.eraser_size if size is None else max(0.5, float(size))
         if len(points) == 1:
             points.append(points[0] + QPointF(0.01, 0.01))
 
         trail = QPainterPath(points[0])
-        for point in points[1:]:
-            trail.lineTo(point)
-        area = stroke_area(trail, self.view.eraser_size)
+        for spot in points[1:]:
+            trail.lineTo(spot)
+        area = stroke_area(trail, diameter)
 
-        if self.view.erase_area(area, whole_objects=self.whole):
-            self.view.snapshot(
-                "Guma",
-                f"guma --tah {point_text(points[0].x(), points[0].y())} "
-                f"{point_text(points[-1].x(), points[-1].y())} "
-                f"--prumer {number(self.view.eraser_size)}"
-                + (" --cele-objekty" if self.whole else ""))
+        if not self.view.erase_area(area, whole_objects=whole):
+            return False
+        # Do historie jde zjednoduseny tah: ruka nakliká stovky bodu, ale
+        # na vysledek maji vliv jen zlomy. Radek pak zustane citelny.
+        shortened = simplify_points(points, 1.0)
+        trail_text = " ".join(point_text(spot.x(), spot.y()) for spot in shortened)
+        self.view.snapshot(
+            "Guma",
+            f"guma --tah {trail_text} --prumer {number(diameter)}"
+            + (" --cele-objekty" if whole else ""))
         return True
 
     def key_press(self, event) -> bool:

@@ -25,6 +25,7 @@ SUITES = [
     ("zaklad.py", [], "SVG, sablony, popisek, panely"),
     ("prevod.py", [], "prevod na krivku a uzly"),
     ("historie.py", [], "viditelna historie operaci"),
+    ("prikazy.py", [], "prikazy a prehrani historie"),
     ("mys.py", [], "kresleni a rez pres udalosti mysi"),
     ("guma.py", [], "guma"),
     ("nuz.py", [], "nuz, zakladni pripady"),
