@@ -164,6 +164,26 @@ pozna a misto vyplneni napise do stavoveho radku, ze oblast neni uzavrena.
 Mezeru pak staci dokreslit, nebo cary spojit pres `Objekt / Napojit krivky`
 (`Ctrl+J`). Je to stejna logika jako hlaseni o neuzavrene hranici v CADu.
 
+## Historie operaci
+
+Zalozka **Historie** vypisuje kazdou upravu jako jeden radek, zapsany
+jako prikaz:
+
+```text
+12:31:34  obdelnik 256 256 448 336 --vypln #ffffff --obrys #000000 --tloustka 8
+12:31:40  nuz "Krivka" --v 520,500 --krizeni 2 --zbylo 2
+12:31:52  guma --tah 799,450 799,550 --prumer 50
+12:32:01  popisek "KOCKA" --velikost 96 --odsazeni 60
+```
+
+Z historie je tedy videt nejen *ze* se neco stalo, ale i s cim a jak.
+Zapis je zamerne psany jako prikaz, protoze stejnou podobu ma pozdeji
+pouzivat prikazova radka a generovani - historie tak nebude jen popis,
+ale i navod, jak kresbu zopakovat.
+
+Pri ulozeni kresby se historie ulozi i vedle ni jako
+`nazev.svg.historie.txt`. Tlacitkem v panelu jde ulozit kamkoliv jinam.
+
 ## Presne kresleni
 
 - **Mrizka** (`Ctrl+G`) a **prichytavani k mrizce** (`F9`) - krok mrizky se meni
@@ -266,6 +286,7 @@ vector_graphics_editor/
     nodes.py            uzly krivek, hladke krivky, napojeni, orezani, rezani
     regionfill.py       hledani uzavrene plochy pro kyblik
     preview.py          nahledy sablon
+    journal.py          viditelna historie operaci
     paths.py            cesty ke slozkam, i uvnitr .exe
     shapes.py           objekty na platne a jejich prevod na SVG
     svgio.py            cteni a zapis SVG, transformace, viewBox

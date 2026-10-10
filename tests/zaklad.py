@@ -127,6 +127,31 @@ window.undo.stack.redo()
 check("znovu", len(window.scene.shapes()) == before * 2)
 
 # ---------------------------------------------------------------------------
+case("zarovnani vice objektu drzi kresbu pohromade")
+window.insert_template(str(PROJECT / "sablony" / "zvirata" / "kocka.svg"))
+shapes_before = {s.name: s.mapToScene(s.local_rect()).boundingRect() for s in
+                 window.scene.shapes()}
+window.select_all()
+window.center_on_page(True)
+moved = {s.name: s.mapToScene(s.local_rect()).boundingRect() for s in
+         window.scene.shapes()}
+deltas = {name: moved[name].x() - box.x() for name, box in shapes_before.items()}
+check("vsechny dily se posunuly stejne",
+      max(deltas.values()) - min(deltas.values()) < 0.5,
+      f"rozptyl {max(deltas.values()) - min(deltas.values()):.1f} px")
+total_before = None
+for box in shapes_before.values():
+    total_before = box if total_before is None else total_before.united(box)
+total_after = None
+for box in moved.values():
+    total_after = box if total_after is None else total_after.united(box)
+check("kresba je na stredu",
+      abs(total_after.center().x() - window.document.width / 2) < 1.0,
+      f"stred {total_after.center().x():.0f}")
+check("sirka kresby se nezmenila",
+      abs(total_after.width() - total_before.width()) < 0.5,
+      f"{total_before.width():.0f} -> {total_after.width():.0f}")
+
 case("popisek pod obrazkem")
 window.caption_panel.text_edit.setText("máma")
 window.apply_caption()
@@ -149,6 +174,7 @@ reloaded = window.caption_shape()
 check("popisek prezil ulozeni", reloaded is not None and reloaded.text() == "MÁMA",
       reloaded.text() if reloaded else "chybi")
 out.unlink(missing_ok=True)
+window.journal_path(out).unlink(missing_ok=True)
 
 # ---------------------------------------------------------------------------
 case("vypln respektuje delici caru")

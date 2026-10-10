@@ -9,3 +9,6 @@ piktogramy/
 
 # Mistni nastaveni nastroju
 .claude/settings.local.json
+
+# Pomocne soubory zkousek
+tests/_*

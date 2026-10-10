@@ -26,6 +26,9 @@ from .nodes import (
     subpath_length,
     subpaths_to_path,
 )
+from .journal import number, quoted, shape_line, style_args
+# 'point' se v nastrojich bezne pouziva jako nazev promenne v cyklech.
+from .journal import point as point_text
 from .shapes import (
     EllipseShape,
     LineShape,
@@ -99,7 +102,7 @@ class Tool:
         self.scene.addItem(shape)
         self.scene.clearSelection()
         shape.setSelected(True)
-        self.view.snapshot(label)
+        self.view.snapshot(label, shape_line(shape))
         if self.one_shot:
             self.view.tool_done.emit()
 
@@ -159,10 +162,27 @@ class SelectTool(Tool):
         if item.toPlainText() != getattr(self, "_text_before", None):
             if not item.toPlainText().strip():
                 self.scene.removeItem(item)
-                self.view.snapshot("Smazani textu")
+                self.view.snapshot("Smazani textu", "text --smazat")
             else:
                 item.name = item.toPlainText().strip()[:24]
-                self.view.snapshot("Zmena textu")
+                self.view.snapshot(
+                    "Zmena textu", f"text {quoted(item.toPlainText())}")
+
+    def _describe(self, operation: str) -> str:
+        """Radek do historie: co se posunulo nebo zmenilo a kam."""
+        shapes = self.scene.selected_shapes()
+        if not shapes:
+            return operation
+        if len(shapes) == 1:
+            shape = shapes[0]
+            box = shape.mapToScene(shape.local_rect()).boundingRect()
+            detail = (f"{operation} {quoted(shape.name)} --na "
+                      f"{point_text(box.x(), box.y())} --rozmer "
+                      f"{number(box.width())}x{number(box.height())}")
+            if shape.rotation():
+                detail += f" --uhel {number(shape.rotation())}"
+            return detail
+        return f"{operation} --objektu {len(shapes)}"
 
     # -- mys --------------------------------------------------------------
     def mouse_press(self, event, scene_pos: QPointF, view_pos: QPointF) -> bool:
@@ -316,11 +336,11 @@ class SelectTool(Tool):
 
         if self.moved:
             if mode == "move":
-                self.view.snapshot("Posun")
+                self.view.snapshot("Posun", self._describe("posun"))
             elif mode == "resize":
-                self.view.snapshot("Zmena velikosti")
+                self.view.snapshot("Zmena velikosti", self._describe("velikost"))
             elif mode == "rotate":
-                self.view.snapshot("Otoceni")
+                self.view.snapshot("Otoceni", self._describe("otoceni"))
         self.moved = False
         return True
 
@@ -358,7 +378,7 @@ class SelectTool(Tool):
                 return False
             for shape in shapes:
                 shape.setPos(shape.pos() + deltas[key])
-            self.view.snapshot("Posun")
+            self.view.snapshot("Posun", self._describe("posun"))
             return True
         return False
 
@@ -423,7 +443,7 @@ class DragShapeTool(Tool):
         shape.sync_origin()
         self.scene.clearSelection()
         shape.setSelected(True)
-        self.view.snapshot(self.label)
+        self.view.snapshot(self.label, shape_line(shape))
         self.finish()
         return True
 
@@ -844,6 +864,20 @@ class NodeTool(Tool):
         self.scene.clearSelection()
         shape.setSelected(True)
 
+    def _node_text(self, operation: str) -> str:
+        """Radek do historie: na ktere krivce a kolikaty uzel."""
+        if self.shape is None:
+            return operation
+        detail = f"{operation} {quoted(self.shape.name)}"
+        if self.selected is not None:
+            part, index = self.selected
+            detail += f" --uzel {index + 1}"
+            nodes = self.subpaths[part].nodes if part < len(self.subpaths) else []
+            if index < len(nodes):
+                spot = self.shape.mapToScene(nodes[index].point)
+                detail += f" --na {point_text(spot.x(), spot.y())}"
+        return detail
+
     def rebuild(self) -> None:
         if self.shape is None:
             return
@@ -947,7 +981,7 @@ class NodeTool(Tool):
         self.drag = None
         self.view.snap_marker = None
         if self.changed:
-            self.view.snapshot("Uprava uzlu")
+            self.view.snapshot("Uprava uzlu", self._node_text("uzel --posun"))
         self.changed = False
         return True
 
@@ -959,7 +993,7 @@ class NodeTool(Tool):
         index = insert_node(self.subpaths[si], ni, t)
         self.selected = (si, index)
         self.rebuild()
-        self.view.snapshot("Pridani uzlu")
+        self.view.snapshot("Pridani uzlu", self._node_text("uzel --pridat"))
         return True
 
     def key_press(self, event) -> bool:
@@ -975,7 +1009,7 @@ class NodeTool(Tool):
             subpath.nodes.pop(ni)
             self.selected = None
             self.rebuild()
-            self.view.snapshot("Smazani uzlu")
+            self.view.snapshot("Smazani uzlu", self._node_text("uzel --smazat"))
             return True
         if key == Qt.Key.Key_S:
             node = subpath.nodes[ni]
@@ -988,12 +1022,12 @@ class NodeTool(Tool):
             else:
                 node.make_smooth()
             self.rebuild()
-            self.view.snapshot("Hladky uzel")
+            self.view.snapshot("Hladky uzel", self._node_text("uzel --hladky"))
             return True
         if key == Qt.Key.Key_C:
             subpath.nodes[ni].make_corner()
             self.rebuild()
-            self.view.snapshot("Rohovy uzel")
+            self.view.snapshot("Rohovy uzel", self._node_text("uzel --rohovy"))
             return True
         if key == Qt.Key.Key_Escape:
             self.selected = None
@@ -1012,7 +1046,7 @@ class NodeTool(Tool):
             node = subpath.nodes[ni]
             node.move_to(node.point + deltas[key])
             self.rebuild()
-            self.view.snapshot("Posun uzlu")
+            self.view.snapshot("Posun uzlu", self._node_text("uzel --posun"))
             return True
         return False
 
@@ -1063,7 +1097,9 @@ class FillTool(Tool):
             style.stroke = (QColor(self.view.default_style.stroke)
                             if self.view.default_style.stroke else None)
             shape.set_style(style)
-            self.view.snapshot("Prebarveni obrysu")
+            self.view.snapshot(
+                "Prebarveni obrysu",
+                f"obrys {quoted(shape.name)} {style_args(shape.style)}")
             return True
 
         force_region = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
@@ -1321,6 +1357,9 @@ class CutTool(Tool):
         target, pieces, remove, crossing_count = plan
 
         whole = len(pieces) == 1
+        where = point_text(scene_pos.x(), scene_pos.y())
+        name = quoted(target.name)
+        self._detail = f"nuz {name} --v {where}"
 
         if keep_all:
             if whole:
@@ -1328,18 +1367,23 @@ class CutTool(Tool):
                     "Shift jen deli, ale tenhle kus neni kde rozdelit - "
                     "protina ho neco jen na koncich.")
                 return
+            self._detail = f"rozdelit {name} --v {where} --casti {len(pieces)}"
             self.view.message.emit(f"Rozdeleno na {len(pieces)} casti, nic se nemazalo.")
         elif crossing_count == 0:
+            self._detail = f"rozdelit {name} --v {where}"
             self.view.message.emit(
                 "Krivka se s nicim nekrizi, takze jsem ji jen rozdelil v miste "
                 "kliknuti. Na orezani je potreba, aby ji neco protinalo.")
         elif whole:
             pieces.pop(remove)
+            self._detail = f"nuz {name} --v {where} --odebrat cely"
             self.view.message.emit(
                 "Odebran cely kus - protinalo ho neco jen na koncich, takze "
                 "cely lezel mezi reznymi hranami.")
         else:
             pieces.pop(remove)
+            self._detail = (f"nuz {name} --v {where} "
+                            f"--krizeni {crossing_count} --zbylo {len(pieces)}")
             self.view.message.emit(
                 f"Odebrano. Z krivky zbyly {len(pieces)} casti "
                 f"(nalezeno {crossing_count} krizeni).")
@@ -1380,7 +1424,10 @@ class CutTool(Tool):
                 touched += 1
 
         if touched:
-            self.view.snapshot("Rez nozem")
+            self.view.snapshot(
+                "Rez nozem",
+                f"nuz --tah {point_text(start.x(), start.y())} "
+                f"{point_text(end.x(), end.y())} --tvaru {touched}")
         else:
             self.view.message.emit("Cara nozem nic neprotala.")
 
@@ -1420,7 +1467,7 @@ class CutTool(Tool):
         for item in created:
             item.setSelected(True)
         if record:
-            self.view.snapshot("Rezani krivky")
+            self.view.snapshot("Rezani krivky", getattr(self, "_detail", None))
 
     def draw_overlay(self, painter: QPainter, scale: float) -> None:
         if self.origin is not None and self.cursor_point is not None:
@@ -1499,7 +1546,12 @@ class EraserTool(Tool):
         area = stroke_area(trail, self.view.eraser_size)
 
         if self.view.erase_area(area, whole_objects=self.whole):
-            self.view.snapshot("Guma")
+            self.view.snapshot(
+                "Guma",
+                f"guma --tah {point_text(points[0].x(), points[0].y())} "
+                f"{point_text(points[-1].x(), points[-1].y())} "
+                f"--prumer {number(self.view.eraser_size)}"
+                + (" --cele-objekty" if self.whole else ""))
         return True
 
     def key_press(self, event) -> bool:

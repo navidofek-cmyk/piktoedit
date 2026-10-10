@@ -20,6 +20,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QGraphicsScene, QGraphicsView
 
+from .journal import color as color_text, number, point, quoted
 from .nodes import erase_from_outline, erase_from_stroke
 from .panels import PART_MIME
 from .regionfill import find_region, image_to_document, raster_scale, render_plain
@@ -196,7 +197,8 @@ class CanvasView(QGraphicsView):
         self.ortho = False
         self.snap_marker: QPointF | None = None
         self.rubber_band: QRectF | None = None
-        self.snapshot: Callable[[str], None] = lambda label: None
+        #: Zapise krok zpet; druhy argument je radek do historie operaci.
+        self.snapshot: Callable[..., None] = lambda label, detail=None: None
 
         self._panning = False
         self._pan_origin = QPointF()
@@ -412,14 +414,17 @@ class CanvasView(QGraphicsView):
         self.canvas_scene.addItem(shape)
         self.canvas_scene.clearSelection()
         shape.setSelected(True)
-        self.snapshot("Vypln oblasti")
+        self.snapshot("Vypln oblasti",
+                      f"vypln --oblast {point(scene_pos.x(), scene_pos.y())} "
+                      f"--barva {color_text(color)}")
         return True
 
     def _recolor(self, shape: ShapeMixin, color: QColor) -> None:
         style = shape.style.copy()
         style.fill = QColor(color)
         shape.set_style(style)
-        self.snapshot("Vypln tvaru")
+        self.snapshot("Vypln tvaru",
+                      f"vypln {quoted(shape.name)} --barva {color_text(color)}")
 
     def _region_matches(self, shape: ShapeMixin, region: QPainterPath) -> bool:
         """Odpovida nalezena plocha cele vnitrni casti tvaru?"""

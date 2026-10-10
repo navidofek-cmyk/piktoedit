@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QPlainTextEdit,
     QPushButton,
     QSizePolicy,
     QSlider,
@@ -666,6 +667,55 @@ class CaptionPanel(QWidget):
             self.color_button.set_color(shape.style.fill or QColor("#000000"))
         finally:
             self._loading = False
+
+
+class HistoryPanel(QWidget):
+    """Viditelna historie operaci.
+
+    Kazdy radek je zapsany jako prikaz, takze z historie je videt nejen
+    ze se neco stalo, ale i s cim a jak.
+    """
+
+    save_requested = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(6)
+
+        self.count_label = QLabel("Zatim zadna operace.", self)
+        self.count_label.setWordWrap(True)
+        self.count_label.setSizePolicy(QSizePolicy.Policy.Ignored,
+                                       QSizePolicy.Policy.Preferred)
+        layout.addWidget(self.count_label)
+
+        self.text = QPlainTextEdit(self)
+        self.text.setReadOnly(True)
+        self.text.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        self.text.setFont(QFont("Consolas", 9))
+        layout.addWidget(self.text, 1)
+
+        self.save_button = QPushButton("Ulozit historii do souboru…", self)
+        layout.addWidget(self.save_button)
+        self.save_button.clicked.connect(self.save_requested.emit)
+
+        hint = QLabel("Historie se uklada i sama vedle kresby pri jejim ulozeni.",
+                      self)
+        hint.setWordWrap(True)
+        hint.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        layout.addWidget(hint)
+
+    def refresh(self, journal) -> None:
+        lines = journal.lines()
+        self.text.setPlainText(chr(10).join(lines))
+        # Posledni radek ma byt videt, aby bylo poznat, co se prave stalo.
+        scrollbar = self.text.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+        if lines:
+            self.count_label.setText(f"Operaci: {len(lines)}")
+        else:
+            self.count_label.setText("Zatim zadna operace.")
 
 
 #: Hezci nazvy slozek se sablonami.
